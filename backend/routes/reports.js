@@ -383,7 +383,8 @@ router.get('/preview-pdf/:filename', authenticateToken, async (req, res) => {
 
     // Set headers for browser preview (inline)
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    // 한글 파일명 대응: inline preview에서도 RFC5987 인코딩 사용
+    res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(filename)}`);
     
     // Send file
     res.sendFile(path.resolve(reportPath));
