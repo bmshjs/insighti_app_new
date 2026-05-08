@@ -28,5 +28,5 @@ jobs:
         run: |
           echo "⏳ Render 빌드 대기 중 (약 4분)..."
           sleep 240
-          curl -sf --max-time 30 https://mobile-app-new.onrender.com/health || echo "⚠️ 헬스 체크 실패 (서버 대기 중이거나 URL 확인 필요)"
+          curl -sf --max-time 30 https://insighti-app-new.onrender.com/health || echo "⚠️ 헬스 체크 실패 (서버 대기 중이거나 URL 확인 필요)"
         continue-on-error: true

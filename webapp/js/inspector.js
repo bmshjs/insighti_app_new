@@ -639,7 +639,7 @@ function buildInspectionEditForm(type, item) {
   if (type === 'thermal') {
     html += `<p class="small" style="color:#6b7280;">열화상은 위치·메모·결과·사진을 수정할 수 있습니다.</p>`;
   }
-  const baseUrl = (typeof api !== 'undefined' && api.baseURL) ? api.baseURL.replace(/\/api\/?$/, '').replace(/\/$/, '') : 'https://mobile-app-new.onrender.com';
+  const baseUrl = (typeof api !== 'undefined' && api.baseURL) ? api.baseURL.replace(/\/api\/?$/, '').replace(/\/$/, '') : 'https://insighti-app-new.onrender.com';
   const photos = item.photos || [];
   // 육안·열화상: 사진 2슬롯 항상 표시 — 사진 영역 클릭 시 촬영/갤러리 선택 (세대주와 동일)
   if (type === 'visual' || type === 'thermal') {
@@ -709,7 +709,7 @@ async function handleEditPhotoAdd(itemId, slotIndex, inputElement) {
     const url = uploadResult.url || `/uploads/${uploadResult.key || uploadResult.filename}`;
     InspectorState._editNewPhotos = InspectorState._editNewPhotos || {};
     InspectorState._editNewPhotos[slotIndex] = { url, sort_order: slotIndex };
-    const baseUrl = (typeof api !== 'undefined' && api.baseURL) ? api.baseURL.replace(/\/api\/?$/, '').replace(/\/$/, '') : 'https://mobile-app-new.onrender.com';
+    const baseUrl = (typeof api !== 'undefined' && api.baseURL) ? api.baseURL.replace(/\/api\/?$/, '').replace(/\/$/, '') : 'https://insighti-app-new.onrender.com';
     const fullUrl = toPhotoFullUrl(baseUrl, url);
     const thumbEl = $(`#ins-edit-photo-new-thumb-${slotIndex}`);
     if (thumbEl) {
@@ -745,7 +745,7 @@ async function handleEditPhotoReplace(itemId, photoId, sortOrder, inputElement) 
     const url = uploadResult.url || `/uploads/${uploadResult.key || uploadResult.filename}`;
     InspectorState._editReplacementPhotos = InspectorState._editReplacementPhotos || {};
     InspectorState._editReplacementPhotos[photoId] = { url, sort_order: sortOrder };
-    const baseUrl = (typeof api !== 'undefined' && api.baseURL) ? api.baseURL.replace(/\/api\/?$/, '').replace(/\/$/, '') : 'https://mobile-app-new.onrender.com';
+    const baseUrl = (typeof api !== 'undefined' && api.baseURL) ? api.baseURL.replace(/\/api\/?$/, '').replace(/\/$/, '') : 'https://insighti-app-new.onrender.com';
     const fullUrl = toPhotoFullUrl(baseUrl, url);
     const thumbEl = $(`#ins-edit-photo-thumb-${photoId}`);
     if (thumbEl) {
@@ -965,7 +965,7 @@ function formatInspectionItemByType(type, item, opts = {}) {
   }
   const baseUrl = (typeof api !== 'undefined' && api && api.baseURL)
     ? String(api.baseURL).replace(/\/api\/?$/, '').replace(/\/$/, '')
-    : 'https://mobile-app-new.onrender.com';
+    : 'https://insighti-app-new.onrender.com';
   const photos = (() => {
     const p = item.photos;
     if (Array.isArray(p)) return p;

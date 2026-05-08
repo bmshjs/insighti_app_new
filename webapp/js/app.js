@@ -460,7 +460,7 @@ async function viewCaseDefects(caseId) {
         })
       );
       
-      const uploadBase = (typeof api !== 'undefined' && api.baseURL) ? api.baseURL.replace(/\/api\/?$/, '').replace(/\/$/, '') : 'https://mobile-app-new.onrender.com';
+      const uploadBase = (typeof api !== 'undefined' && api.baseURL) ? api.baseURL.replace(/\/api\/?$/, '').replace(/\/$/, '') : 'https://insighti-app-new.onrender.com';
       const toPhotoUrl = (raw) => {
         if (!raw || typeof raw !== 'string') return '';
         const s = String(raw).trim();
@@ -576,7 +576,7 @@ async function editDefect(defectId) {
       photoFar.classList.remove('has-image');
       
       // 저장된 사진 표시
-      const uploadBase = (typeof api !== 'undefined' && api.baseURL) ? api.baseURL.replace(/\/api\/?$/, '').replace(/\/$/, '') : 'https://mobile-app-new.onrender.com';
+      const uploadBase = (typeof api !== 'undefined' && api.baseURL) ? api.baseURL.replace(/\/api\/?$/, '').replace(/\/$/, '') : 'https://insighti-app-new.onrender.com';
       const toPhotoUrl = (raw) => {
         if (!raw || typeof raw !== 'string') return '';
         const s = String(raw).trim();

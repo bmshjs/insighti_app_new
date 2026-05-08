@@ -320,7 +320,7 @@ router.post('/send', authenticateToken, async (req, res) => {
     const filename = `report-${householdId}-${Date.now()}.pdf`;
     const pdfResult = await pdfGenerator.generatePDF('comprehensive-report', reportData, { filename });
 
-    const baseUrl = process.env.BACKEND_URL || 'https://mobile-app-new.onrender.com';
+    const baseUrl = process.env.BACKEND_URL || 'https://insighti-app-new.onrender.com';
     const fullPdfUrl = `${baseUrl}${pdfResult.url}`;
     const caseInfo = {
       complex: data.complex,

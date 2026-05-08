@@ -5,7 +5,7 @@ class APIClient {
     const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     this.baseURL = isDevelopment 
       ? 'http://localhost:3000/api'
-      : 'https://mobile-app-new.onrender.com/api'; // 무료 Render 도메인
+      : 'https://insighti-app-new.onrender.com/api'; // Render backend domain
     this.token = localStorage.getItem('insighti_token');
     console.log('API Base URL:', this.baseURL);
   }

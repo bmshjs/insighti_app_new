@@ -5,7 +5,7 @@ const $$ = (q) => document.querySelectorAll(q);
 // API Base URL
 const API_BASE = window.location.hostname === 'localhost' 
   ? 'http://localhost:3000' 
-  : 'https://mobile-app-new.onrender.com';
+  : 'https://insighti-app-new.onrender.com';
 
 // Admin State
 const AdminState = {
