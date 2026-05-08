@@ -53,15 +53,13 @@ class LocalDetector extends BaseDetector {
     }
     
     if (this.mode === 'clip') {
-      // 추후 CLIP 모델 로드
-      console.log('⏳ CLIP 모델 로드 예정...');
-      // TODO: CLIP 구현
+      // 현재는 실제 모델 로드 없이 mock 분석 경로를 사용
+      console.log('⏳ CLIP 모드: mock 분석 경로 사용');
     }
     
     if (this.mode === 'mobilenet') {
-      // 추후 MobileNet 로드
-      console.log('⏳ MobileNet 모델 로드 예정...');
-      // TODO: MobileNet 구현
+      // 현재는 실제 모델 로드 없이 mock 분석 경로를 사용
+      console.log('⏳ MobileNet 모드: mock 분석 경로 사용');
     }
   }
 
@@ -77,12 +75,10 @@ class LocalDetector extends BaseDetector {
     }
     
     if (this.mode === 'clip') {
-      // TODO: CLIP 분석
       return this.analyzeMock(imageFile, startTime);
     }
     
     if (this.mode === 'mobilenet') {
-      // TODO: MobileNet 분석
       return this.analyzeMock(imageFile, startTime);
     }
   }

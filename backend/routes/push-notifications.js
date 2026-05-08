@@ -73,9 +73,7 @@ router.post('/subscribe', authenticateToken, async (req, res) => {
       name = admin.name;
       userType = admin.role === 'super_admin' ? 'super_admin' : 'admin';
       
-      // 관리자 계정의 경우 household_id는 NULL로 설정
-      // push_subscription 테이블의 household_id를 NULL 허용하도록 수정 필요
-      // 일단 임시로 0을 사용 (나중에 스키마 수정 필요)
+      // 관리자 계정은 household_id 없이 endpoint 기준으로 구독 관리
       householdIdToUse = null;
     } else {
       // 일반 사용자 계정인 경우
@@ -113,8 +111,7 @@ router.post('/subscribe', authenticateToken, async (req, res) => {
       name = household.resident_name;
     }
 
-    // 구독 정보 저장 (household_id가 NULL인 경우를 처리)
-    // 관리자 계정과 일반 사용자 계정을 분리하여 처리
+    // 구독 정보 저장: 관리자/일반 사용자 충돌을 피하기 위해 UPSERT 키를 분리
     if (householdIdToUse === null) {
       // 관리자 계정: endpoint만으로 UNIQUE 제약 조건 처리
       const adminQuery = `

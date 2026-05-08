@@ -674,7 +674,7 @@ function cancelEdit() {
   route('list');
 }
 
-// 하자 삭제 (Phase 1-4에서 구현 예정)
+// 하자 삭제는 현재 클라이언트에서 비활성화(서버 정책 정리 후 활성화 예정)
 async function deleteDefect(defectId) {
   toast('하자 삭제 기능은 다음 단계에서 구현됩니다', 'info');
 }
@@ -1671,12 +1671,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     toast('서버 연결 중입니다 (최대 1-2분 소요)', 'info');
   }
   
-  // 세션 복원 비활성화 - 항상 로그인 화면 표시
-  // 저장된 세션이 있어도 자동 로그인하지 않음
+  // 정책: 저장된 세션이 있어도 자동 로그인하지 않고 로그인 화면에서 시작
   const savedSession = localStorage.getItem('insighti_session');
   if (savedSession) {
     debugLog('💾 저장된 세션이 있지만 자동 로그인은 비활성화되어 있습니다');
-    // 세션은 유지하되 로그인 화면 표시
+    // 세션 정보는 유지하고 시작 화면만 로그인으로 고정
   }
   
   // 항상 로그인 화면으로 이동
@@ -1714,7 +1713,7 @@ async function saveLearningData(filename, analysisResult, photoType) {
       created_at: new Date().toISOString()
     };
     
-    // localStorage에 임시 저장 (서버 API 추가 전까지)
+    // 로컬 백업 저장(오프라인/디버깅 용도)
     const savedData = JSON.parse(localStorage.getItem('learning_data') || '[]');
     savedData.push(learningData);
     

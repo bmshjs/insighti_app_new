@@ -142,17 +142,10 @@ class PPTXGenerator {
         await this.addHouseholdInfo(zip, slideFiles[0], data, parser, builder);
       }
 
-      // 단계 2-4: 하자 및 측정 정보를 위한 새 슬라이드 추가
-      // 주의: 새 슬라이드 추가는 PowerPoint 파일 구조를 복잡하게 만들 수 있음
-      // 현재는 첫 번째 슬라이드만 수정하는 방식으로 진행
-      // 향후 템플릿 슬라이드를 복사하여 수정하는 방식으로 개선 예정
+      // 현재 구현 범위: 첫 번째 슬라이드만 수정
+      // (슬라이드 추가 기능은 별도 구현 시점에 반영)
       console.log('⚠️ 현재는 첫 번째 슬라이드만 수정합니다.');
-      console.log('   새 슬라이드 추가 기능은 향후 구현 예정입니다.');
-      
-      // await this.addDefectsAndMeasurements(zip, data, parser, builder);
-      // await this.addSummarySlide(zip, data, parser, builder);
-      // await this.updateContentTypes(zip);
-      // await this.updatePresentationFile(zip);
+      console.log('   다중 슬라이드 확장은 별도 작업으로 관리합니다.');
 
       // ZIP 파일 저장
       zip.writeZip(outputPath);
