@@ -257,12 +257,12 @@
             <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
               <div style="flex: 1; min-width: 140px;">
                 <input type="file" id="defect-visual-photo-1" accept="image/*" style="display: none;" onchange="handleMeasurementPhotoUpload('visual', this, 0)" />
-                <button type="button" class="button" onclick="document.getElementById('defect-visual-photo-1').click()" style="width: 100%;">📷 사진 1</button>
+                <button type="button" class="button" onclick="triggerMeasurementPhotoInput('defect-visual-photo-1')" style="width: 100%;">📷 사진 1</button>
                 <div id="defect-visual-photo-preview-1" style="margin-top: 6px; min-height: 120px; border: 1px solid #ddd; border-radius: 4px; background-size: contain; background-position: center; background-repeat: no-repeat; display: none; background-color: #f5f5f5;"></div>
               </div>
               <div style="flex: 1; min-width: 140px;">
                 <input type="file" id="defect-visual-photo-2" accept="image/*" style="display: none;" onchange="handleMeasurementPhotoUpload('visual', this, 1)" />
-                <button type="button" class="button" onclick="document.getElementById('defect-visual-photo-2').click()" style="width: 100%;">📷 사진 2</button>
+                <button type="button" class="button" onclick="triggerMeasurementPhotoInput('defect-visual-photo-2')" style="width: 100%;">📷 사진 2</button>
                 <div id="defect-visual-photo-preview-2" style="margin-top: 6px; min-height: 120px; border: 1px solid #ddd; border-radius: 4px; background-size: contain; background-position: center; background-repeat: no-repeat; display: none; background-color: #f5f5f5;"></div>
               </div>
             </div>
@@ -325,12 +325,12 @@
             <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
               <div style="flex: 1; min-width: 140px;">
                 <input type="file" id="defect-air-photo-1" accept="image/*" style="display: none;" onchange="handleMeasurementPhotoUpload('air', this, 0)" />
-                <button type="button" class="button" onclick="document.getElementById('defect-air-photo-1').click()" style="width: 100%;">📷 사진 1</button>
+                <button type="button" class="button" onclick="triggerMeasurementPhotoInput('defect-air-photo-1')" style="width: 100%;">📷 사진 1</button>
                 <div id="defect-air-photo-preview-1" style="margin-top: 6px; min-height: 120px; border: 1px solid #ddd; border-radius: 4px; background-size: contain; background-position: center; background-repeat: no-repeat; display: none; background-color: #f5f5f5;"></div>
               </div>
               <div style="flex: 1; min-width: 140px;">
                 <input type="file" id="defect-air-photo-2" accept="image/*" style="display: none;" onchange="handleMeasurementPhotoUpload('air', this, 1)" />
-                <button type="button" class="button" onclick="document.getElementById('defect-air-photo-2').click()" style="width: 100%;">📷 사진 2</button>
+                <button type="button" class="button" onclick="triggerMeasurementPhotoInput('defect-air-photo-2')" style="width: 100%;">📷 사진 2</button>
                 <div id="defect-air-photo-preview-2" style="margin-top: 6px; min-height: 120px; border: 1px solid #ddd; border-radius: 4px; background-size: contain; background-position: center; background-repeat: no-repeat; display: none; background-color: #f5f5f5;"></div>
               </div>
             </div>
@@ -382,12 +382,12 @@
             <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
               <div style="flex: 1; min-width: 140px;">
                 <input type="file" id="defect-radon-photo-1" accept="image/*" style="display: none;" onchange="handleMeasurementPhotoUpload('radon', this, 0)" />
-                <button type="button" class="button" onclick="document.getElementById('defect-radon-photo-1').click()" style="width: 100%;">📷 사진 1</button>
+                <button type="button" class="button" onclick="triggerMeasurementPhotoInput('defect-radon-photo-1')" style="width: 100%;">📷 사진 1</button>
                 <div id="defect-radon-photo-preview-1" style="margin-top: 6px; min-height: 120px; border: 1px solid #ddd; border-radius: 4px; background-size: contain; background-position: center; background-repeat: no-repeat; display: none; background-color: #f5f5f5;"></div>
               </div>
               <div style="flex: 1; min-width: 140px;">
                 <input type="file" id="defect-radon-photo-2" accept="image/*" style="display: none;" onchange="handleMeasurementPhotoUpload('radon', this, 1)" />
-                <button type="button" class="button" onclick="document.getElementById('defect-radon-photo-2').click()" style="width: 100%;">📷 사진 2</button>
+                <button type="button" class="button" onclick="triggerMeasurementPhotoInput('defect-radon-photo-2')" style="width: 100%;">📷 사진 2</button>
                 <div id="defect-radon-photo-preview-2" style="margin-top: 6px; min-height: 120px; border: 1px solid #ddd; border-radius: 4px; background-size: contain; background-position: center; background-repeat: no-repeat; display: none; background-color: #f5f5f5;"></div>
               </div>
             </div>
@@ -471,12 +471,12 @@
             <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
               <div style="flex: 1; min-width: 140px;">
                 <input type="file" id="defect-level-photo-1" accept="image/*" style="display: none;" onchange="handleMeasurementPhotoUpload('level', this, 0)" />
-                <button type="button" class="button" onclick="document.getElementById('defect-level-photo-1').click()" style="width: 100%;">📷 사진 1</button>
+                <button type="button" class="button" onclick="triggerMeasurementPhotoInput('defect-level-photo-1')" style="width: 100%;">📷 사진 1</button>
                 <div id="defect-level-photo-preview-1" style="margin-top: 6px; min-height: 120px; border: 1px solid #ddd; border-radius: 4px; background-size: contain; background-position: center; background-repeat: no-repeat; display: none; background-color: #f5f5f5;"></div>
               </div>
               <div style="flex: 1; min-width: 140px;">
                 <input type="file" id="defect-level-photo-2" accept="image/*" style="display: none;" onchange="handleMeasurementPhotoUpload('level', this, 1)" />
-                <button type="button" class="button" onclick="document.getElementById('defect-level-photo-2').click()" style="width: 100%;">📷 사진 2</button>
+                <button type="button" class="button" onclick="triggerMeasurementPhotoInput('defect-level-photo-2')" style="width: 100%;">📷 사진 2</button>
                 <div id="defect-level-photo-preview-2" style="margin-top: 6px; min-height: 120px; border: 1px solid #ddd; border-radius: 4px; background-size: contain; background-position: center; background-repeat: no-repeat; display: none; background-color: #f5f5f5;"></div>
               </div>
             </div>
@@ -495,12 +495,12 @@
             <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
               <div style="flex: 1; min-width: 140px;">
                 <input type="file" id="defect-thermal-photo-1" accept="image/*" style="display: none;" onchange="handleMeasurementPhotoUpload('thermal', this, 0)" />
-                <button type="button" class="button" onclick="document.getElementById('defect-thermal-photo-1').click()" style="width: 100%;">📷 사진 1</button>
+                <button type="button" class="button" onclick="triggerMeasurementPhotoInput('defect-thermal-photo-1')" style="width: 100%;">📷 사진 1</button>
                 <div id="defect-thermal-photo-preview-1" style="margin-top: 6px; min-height: 120px; border: 1px solid #ddd; border-radius: 4px; background-size: contain; background-position: center; background-repeat: no-repeat; display: none; background-color: #f5f5f5;"></div>
               </div>
               <div style="flex: 1; min-width: 140px;">
                 <input type="file" id="defect-thermal-photo-2" accept="image/*" style="display: none;" onchange="handleMeasurementPhotoUpload('thermal', this, 1)" />
-                <button type="button" class="button" onclick="document.getElementById('defect-thermal-photo-2').click()" style="width: 100%;">📷 사진 2</button>
+                <button type="button" class="button" onclick="triggerMeasurementPhotoInput('defect-thermal-photo-2')" style="width: 100%;">📷 사진 2</button>
                 <div id="defect-thermal-photo-preview-2" style="margin-top: 6px; min-height: 120px; border: 1px solid #ddd; border-radius: 4px; background-size: contain; background-position: center; background-repeat: no-repeat; display: none; background-color: #f5f5f5;"></div>
               </div>
             </div>

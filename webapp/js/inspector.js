@@ -657,8 +657,8 @@ function buildInspectionEditForm(type, item) {
           ? `background-image:url('${fullUrl}');cursor:pointer;`
           : 'background-color:#f5f5f5;cursor:pointer;';
         const clickHandler = photoId
-          ? `document.getElementById('ins-edit-photo-replace-${photoId}').click()`
-          : `document.getElementById('ins-edit-photo-replace-${type}-${idx}').click()`;
+          ? `triggerFileInputWithSource('ins-edit-photo-replace-${photoId}')`
+          : `triggerFileInputWithSource('ins-edit-photo-replace-${type}-${idx}')`;
         photoSlotsHtml += `<div style="display:inline-flex;flex-direction:column;align-items:center;gap:4px;margin:4px;">
           <input type="file" id="${inputId}" accept="image/*" style="display:none" onchange="handleEditPhotoReplace('${item.id}', '${photoId || ''}', ${sortOrder}, this)" />
           <div id="${thumbId}" class="thumb" style="${thumbStyle}width:80px;height:80px;background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:8px;border:1px solid #e5e7eb;" onclick="${clickHandler}" title="탭하여 사진 촬영 또는 갤러리에서 선택"></div>
@@ -666,7 +666,7 @@ function buildInspectionEditForm(type, item) {
       } else {
         photoSlotsHtml += `<div style="display:inline-flex;flex-direction:column;align-items:center;gap:4px;margin:4px;">
           <input type="file" id="ins-edit-photo-add-${idx}" accept="image/*" style="display:none" onchange="handleEditPhotoAdd('${item.id}', ${idx}, this)" />
-          <div id="ins-edit-photo-new-thumb-${idx}" class="thumb" style="width:80px;height:80px;background-color:#f5f5f5;background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:8px;border:1px dashed #d1d5db;cursor:pointer;" onclick="document.getElementById('ins-edit-photo-add-${idx}').click()" title="탭하여 사진 촬영 또는 갤러리에서 선택"></div>
+          <div id="ins-edit-photo-new-thumb-${idx}" class="thumb" style="width:80px;height:80px;background-color:#f5f5f5;background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:8px;border:1px dashed #d1d5db;cursor:pointer;" onclick="triggerFileInputWithSource('ins-edit-photo-add-${idx}')" title="탭하여 사진 촬영 또는 갤러리에서 선택"></div>
         </div>`;
       }
     }
@@ -683,7 +683,7 @@ function buildInspectionEditForm(type, item) {
       const thumbId = photoId ? `ins-edit-photo-thumb-${photoId}` : `ins-edit-photo-thumb-other-${idx}`;
       return `<div style="display:inline-flex;flex-direction:column;align-items:center;gap:4px;margin:4px;">
         <input type="file" id="${inputId}" accept="image/*" style="display:none" onchange="handleEditPhotoReplace('${item.id}', '${photoId || ''}', ${sortOrder}, this)" />
-        <div id="${thumbId}" class="thumb has-image" style="background-image:url('${fullUrl}');cursor:pointer;width:80px;height:80px;background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:8px;border:1px solid #e5e7eb;" onclick="document.getElementById('${inputId}').click()" title="탭하여 사진 촬영 또는 갤러리에서 선택"></div>
+        <div id="${thumbId}" class="thumb has-image" style="background-image:url('${fullUrl}');cursor:pointer;width:80px;height:80px;background-size:contain;background-position:center;background-repeat:no-repeat;border-radius:8px;border:1px solid #e5e7eb;" onclick="triggerFileInputWithSource('${inputId}')" title="탭하여 사진 촬영 또는 갤러리에서 선택"></div>
       </div>`;
     }).filter(Boolean).join('');
     html += `<div class="form-group"><label class="form-label">등록된 사진 (${photos.length}장) — 탭하여 교체</label><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">${photoItems}</div></div>`;
@@ -1251,6 +1251,19 @@ function showDefectInspectionTab(tabType) {
   if (tabContent) {
     tabContent.classList.remove('hidden');
   }
+}
+
+function triggerFileInputWithSource(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const useCamera = window.confirm('카메라로 촬영하려면 확인, 갤러리에서 선택하려면 취소를 누르세요.');
+  if (useCamera) input.setAttribute('capture', 'environment');
+  else input.removeAttribute('capture');
+  input.click();
+}
+
+function triggerMeasurementPhotoInput(inputId) {
+  triggerFileInputWithSource(inputId);
 }
 
 // 이미지 압축 함수 (app.js의 compressImage 복사)
