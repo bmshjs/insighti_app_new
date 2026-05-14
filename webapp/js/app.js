@@ -910,48 +910,59 @@ function initializeUI() {
 
 // 기획서 요구사항 구현 함수들
 
-// 하자 카테고리 목록 로드
-async function loadDefectCategories() {
-  try {
-    const categories = await api.getDefectCategories();
-    const select = $('#defect-category');
-    
-    // 기존 옵션 제거 (첫 번째 옵션 제외)
-    while (select.children.length > 1) {
-      select.removeChild(select.lastChild);
-    }
-    
-    // 카테고리별로 그룹화
-    const grouped = categories.reduce((acc, category) => {
-      if (!acc[category.category]) {
-        acc[category.category] = [];
-      }
-      acc[category.category].push(category);
-      return acc;
-    }, {});
-    
-    // 카테고리별로 옵션 추가
-    Object.keys(grouped).forEach(categoryName => {
-      const optgroup = document.createElement('optgroup');
-      optgroup.label = categoryName;
-      
-      grouped[categoryName].forEach(category => {
-        const option = document.createElement('option');
-        option.value = category.id;
-        option.textContent = category.name;
-        optgroup.appendChild(option);
-      });
-      
-      select.appendChild(optgroup);
-    });
-    // 직접 입력 옵션 추가
+function ensureDefectCategoryCustomOption(select) {
+  if (!select) return;
+  const has = Array.from(select.options).some((o) => o.value === '__custom__');
+  if (!has) {
     const customOpt = document.createElement('option');
     customOpt.value = '__custom__';
     customOpt.textContent = '직접 입력';
     select.appendChild(customOpt);
+  }
+}
+
+// 하자 카테고리 목록 로드
+async function loadDefectCategories() {
+  const select = $('#defect-category');
+  if (!select) return;
+
+  while (select.children.length > 1) {
+    select.removeChild(select.lastChild);
+  }
+
+  try {
+    const categories = await api.getDefectCategories();
+    const list = Array.isArray(categories) ? categories : [];
+
+    const grouped = list.reduce((acc, category) => {
+      const groupName = category.category || '기타';
+      if (!acc[groupName]) acc[groupName] = [];
+      acc[groupName].push(category);
+      return acc;
+    }, {});
+
+    Object.keys(grouped)
+      .sort()
+      .forEach((categoryName) => {
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = categoryName;
+        grouped[categoryName].forEach((category) => {
+          const option = document.createElement('option');
+          option.value = category.id;
+          option.textContent = category.name;
+          optgroup.appendChild(option);
+        });
+        select.appendChild(optgroup);
+      });
+
+    if (list.length === 0) {
+      console.warn('하자 표준 카테고리가 비어 있습니다. DB에 시드를 적용하면 목록이 복구됩니다. (db/migrations/002_defect_categories.sql)');
+    }
   } catch (error) {
     console.error('하자 카테고리 로드 실패:', error);
-    toast('하자 카테고리를 불러올 수 없습니다', 'error');
+    toast('하자 카테고리를 불러올 수 없습니다. 직접 입력으로 등록할 수 있습니다.', 'error');
+  } finally {
+    ensureDefectCategoryCustomOption(select);
   }
 }
 
@@ -991,7 +1002,11 @@ async function loadDefectDescription() {
     
     // 하자 내용 자동 입력
     $('#def-content').value = categoryDetail.description;
-    
+    const tradeInput = $('#def-trade');
+    if (tradeInput && categoryDetail.name) {
+      tradeInput.value = categoryDetail.name;
+    }
+
     // 실시간 YouTube 검색 시도
     console.log(`🔍 YouTube 실시간 검색 시작: "${categoryDetail.name}"`);
     

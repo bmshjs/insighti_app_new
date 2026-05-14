@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "migrate:defect-categories": "node backend/scripts/run-defect-categories-migration.js"
+  },
   "dependencies": {
     "node-fetch": "^3.3.2"
   }

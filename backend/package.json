@@ -16,6 +16,7 @@
     "migrate": "node scripts/migrate.js",
     "migrate:inspection-photos": "node scripts/migrate-inspection-photos.js",
     "migrate:pdf-form": "node scripts/run-pdf-form-migration.js",
+    "migrate:defect-categories": "node scripts/run-defect-categories-migration.js",
     "trim-households": "node scripts/trim-households-to-five.js",
     "create-inspector": "node scripts/create-inspector-household.js",
     "seed-inspections-final-report": "node scripts/seed-inspections-and-final-report.js",

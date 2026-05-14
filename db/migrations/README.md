@@ -36,3 +36,36 @@ DATABASE_URL="postgresql://postgres:insighti123@127.0.0.1:5432/insighti_db" node
 ```
 
 (로컬 Postgres에 `postgres` 사용자가 없으면 해당 DB에 맞는 사용자/비밀번호로 `DATABASE_URL`을 설정하세요.)
+
+## 002_defect_categories.sql (하자 표준 카테고리·동영상 매핑)
+
+하자명 드롭다운(`/api/defect-categories`)용 `defect_categories`, `defect_videos` 테이블 생성 및 기본 10건 시드입니다. DB가 비어 있거나 테이블이 없을 때 실행하세요.
+
+```bash
+# 프로젝트 루트
+export DATABASE_URL="postgresql://..."
+psql "$DATABASE_URL" -f db/migrations/002_defect_categories.sql
+```
+
+또는 Node:
+
+```bash
+cd backend
+DATABASE_URL="postgresql://..." npm run migrate:defect-categories
+```
+
+### Cursor / npm 없이 Windows에서 실행
+
+프로젝트 루트에서 (Cursor에 포함된 Node 사용, `backend/.env`의 `DATABASE_URL` 적용):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-migrate-defect-categories.ps1
+```
+
+루트에서 `node`만 있을 때:
+
+```bash
+node backend/scripts/run-defect-categories-migration.js
+```
+
+(`backend/node_modules`가 없으면 한 번 `cd backend && npm install` 필요)
