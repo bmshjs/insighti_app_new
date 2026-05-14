@@ -586,21 +586,9 @@
         // 새 Service Worker 등록
         const registration = await navigator.serviceWorker.register('/sw.js');
         console.log('✅ Service Worker 등록 완료:', registration.scope);
-        
-        // Service Worker 업데이트 확인
-        registration.addEventListener('updatefound', () => {
-          console.log('🔄 Service Worker 업데이트 발견');
-          const newWorker = registration.installing;
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'activated') {
-              console.log('✅ 새 Service Worker 활성화됨');
-              // 페이지 새로고침 권장
-              if (confirm('새 버전이 업데이트되었습니다. 페이지를 새로고침하시겠습니까?')) {
-                window.location.reload();
-              }
-            }
-          });
-        });
+        // 주의: updatefound + activated 시 confirm은 "첫 등록"에도 발생해
+        // (매 로드마다 unregister → register 시) 새로고침 무한 루프가 된다.
+        // 버전 안내가 필요하면 registration.waiting + 기존 controller 조합으로만 처리할 것.
       } catch (error) {
         console.error('❌ Service Worker 등록 실패:', error);
       }
