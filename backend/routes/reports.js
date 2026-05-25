@@ -174,12 +174,16 @@ router.post('/generate', authenticateToken, async (req, res) => {
       const householdInsp = await loadHouseholdInspectionsForReport(householdId);
       reportData = {
         ...reportData,
+        defects: defectsWithIndex,
         visual_inspections: householdInsp.visual,
         thermal_inspections: householdInsp.thermal,
         air_measurements: householdInsp.air,
         radon_measurements: householdInsp.radon,
         level_measurements: householdInsp.level
       };
+      console.log(
+        `[final-report] household=${householdId} defects=${reportData.defects.length} visual=${reportData.visual_inspections.length}`
+      );
     }
 
     let pdfResult;

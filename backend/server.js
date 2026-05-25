@@ -3,6 +3,7 @@ require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const path = require('path');
@@ -120,6 +121,9 @@ app.use(express.urlencoded({ extended: true }));
 const uploadDir = path.isAbsolute(config.upload.dir)
   ? config.upload.dir
   : path.join(__dirname, config.upload.dir);
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 app.use('/uploads', express.static(uploadDir));
 app.use('/uploads/thumbs', express.static(path.join(uploadDir, 'thumbs')));
 app.use('/reports', express.static(path.join(__dirname, 'reports')));
@@ -147,7 +151,7 @@ app.get('/', (req, res) => {
     status: 'OK', 
     message: 'InsightI API Server is running',
     timestamp: new Date().toISOString(),
-    version: '4.0.1'
+    version: '4.0.2'
   });
 });
 
@@ -156,7 +160,7 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    version: '4.0.1'
+    version: '4.0.2'
   });
 });
 
@@ -164,7 +168,7 @@ app.get('/health', (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     name: 'InsightI Pre/Post Inspection API',
-    version: '4.0.1', // Error handling improvements
+    version: '4.0.2', // Error handling improvements
     endpoints: {
       auth: '/api/auth',
       cases: '/api/cases',

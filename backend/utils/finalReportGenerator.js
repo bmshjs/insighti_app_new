@@ -4,6 +4,8 @@
  */
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
+const https = require('https');
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 
 const LAYOUT = require('./finalReportLayout');
@@ -19,6 +21,8 @@ const UPLOADS_DIR = path.isAbsolute(config.upload.dir)
   : path.join(__dirname, '..', config.upload.dir.replace(/^\.\//, ''));
 const AIR_DIAGRAM_PATH = path.join(ASSETS_DIR, 'air_quality_diagram.png');
 const LEVEL_DIAGRAM_PATH = path.join(ASSETS_DIR, 'level_diagram.png');
+
+const PUBLIC_BASE_URL = (process.env.BACKEND_URL || process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
 
 /** file_url(/uploads/xxx, uploads/xxx, http(s)://host/uploads/xxx) → 서버 내 절대 경로. 없으면 null */
 function getPhotoPath(fileUrl) {
@@ -42,14 +46,70 @@ function getPhotoPath(fileUrl) {
   return null;
 }
 
+/** 상대/절대 URL → HTTP(S) 전체 URL */
+function resolvePhotoHttpUrl(fileUrl) {
+  if (!fileUrl || typeof fileUrl !== 'string') return null;
+  const u = String(fileUrl).trim();
+  if (/^https?:\/\//i.test(u)) return u;
+  if (!PUBLIC_BASE_URL) return null;
+  return u.startsWith('/') ? `${PUBLIC_BASE_URL}${u}` : `${PUBLIC_BASE_URL}/${u}`;
+}
+
+function fetchUrlBuffer(url, redirects = 0) {
+  return new Promise((resolve) => {
+    if (!url || redirects > 5) return resolve(null);
+    const lib = url.startsWith('https') ? https : http;
+    lib.get(url, (res) => {
+      if ([301, 302, 307, 308].includes(res.statusCode) && res.headers.location) {
+        res.resume();
+        return resolve(fetchUrlBuffer(res.headers.location, redirects + 1));
+      }
+      if (res.statusCode !== 200) {
+        res.resume();
+        return resolve(null);
+      }
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve(Buffer.concat(chunks)));
+    }).on('error', () => resolve(null));
+  });
+}
+
+/** 로컬 uploads → 없으면 BACKEND_URL HTTP로 이미지 로드 */
+async function loadImageBytes(fileUrl) {
+  const localPath = getPhotoPath(fileUrl);
+  if (localPath && fs.existsSync(localPath)) {
+    try {
+      return fs.readFileSync(localPath);
+    } catch (_) {
+      /* try http */
+    }
+  }
+  const httpUrl = resolvePhotoHttpUrl(fileUrl);
+  if (httpUrl) {
+    const remote = await fetchUrlBuffer(httpUrl);
+    if (remote && remote.length > 100) return remote;
+  }
+  return null;
+}
+
 /** 사진 파일을 PDF에 임베드하고 페이지에 그리기. 실패 시 무시 */
 async function embedAndDrawPhoto(pdfDoc, page, fileUrl, x, y, w, h) {
-  const photoPath = getPhotoPath(fileUrl);
-  if (!photoPath || !fs.existsSync(photoPath)) return;
   try {
-    const buf = fs.readFileSync(photoPath);
+    const buf = await loadImageBytes(fileUrl);
+    if (!buf || buf.length < 10) return;
     const isPng = buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e;
-    const image = isPng ? await pdfDoc.embedPng(buf) : await pdfDoc.embedJpg(buf);
+    const isJpg = buf[0] === 0xff && buf[1] === 0xd8;
+    let image;
+    if (isPng) image = await pdfDoc.embedPng(buf);
+    else if (isJpg) image = await pdfDoc.embedJpg(buf);
+    else {
+      try {
+        image = await pdfDoc.embedJpg(buf);
+      } catch (_) {
+        image = await pdfDoc.embedPng(buf);
+      }
+    }
     const dims = image.scale(1);
     const scale = Math.min(w / dims.width, h / dims.height, 1);
     const drawW = dims.width * scale;
@@ -112,6 +172,18 @@ function defectToVisualItem(defect) {
   };
 }
 
+/** 점검 사진 배열 정규화 (inspection_photo / photo 테이블 공통) */
+function normalizePhotoList(photos) {
+  if (!photos) return [];
+  const list = Array.isArray(photos) ? photos : [photos];
+  return list
+    .map((p) => {
+      const url = p && (p.file_url || p.url || p.thumb_url);
+      return url ? { ...p, file_url: url, url } : null;
+    })
+    .filter(Boolean);
+}
+
 /**
  * 8p 육안: 세대주 등록 하자 → 점검원 육안점검 순서
  */
@@ -119,13 +191,23 @@ function getVisualPageItems(reportData) {
   const items = [];
   const defects = reportData.defects || [];
   const inspections = reportData.visual_inspections || [];
+
   if (defects.length > 0) {
     items.push({ _sectionHeader: true, title: '세대주 등록 하자' });
     defects.forEach((d) => items.push(defectToVisualItem(d)));
   }
   if (inspections.length > 0) {
     items.push({ _sectionHeader: true, title: '점검원 육안점검' });
-    inspections.forEach((i) => items.push(i));
+    inspections.forEach((i) => {
+      items.push({
+        ...i,
+        location: i.location || '',
+        trade: i.trade || '',
+        note: i.note || '',
+        result_text: i.result_text ?? i.result ?? '',
+        photos: normalizePhotoList(i.photos)
+      });
+    });
   }
   return items;
 }
@@ -368,8 +450,8 @@ async function drawVisualBlocksOnPage(pdfDoc, page, font, reportData, chunk) {
     cursorY -= totalBlockH;
     const locVal = safeText(item.location);
     const tradeVal = safeText(item.trade);
-    const defectVal = safeText(item.note);
-    const noteVal = safeText(item.result_text ?? item.result ?? item.note ?? '');
+    const defectVal = safeText(item.content ?? item.note);
+    const noteVal = safeText(item.result_text ?? item.result ?? item.memo ?? '');
 
     // 1) 위치 행: [위치](파란) [값](초록)
     const valueW1 = cw - lw;
@@ -1300,6 +1382,8 @@ module.exports = {
   generateFinalReportValues,
   getVisualPageItems,
   defectToVisualItem,
+  normalizePhotoList,
+  loadImageBytes,
   TEMPLATE_FILENAME,
   FILL_PAGE_INDICES: [7, 9, 11, 12]
 };

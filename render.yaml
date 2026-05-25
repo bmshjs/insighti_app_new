@@ -7,12 +7,16 @@ services:
     rootDir: backend
     buildCommand: npm install --legacy-peer-deps && node scripts/ensure-korean-font.js
     startCommand: npm start
-    healthCheckPath: /
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
+      - key: BACKEND_URL
+        value: https://insighti-app-new.onrender.com
+      - key: UPLOAD_DIR
+        value: ./uploads
       - key: JWT_SECRET
         value: insighti-super-secret-key-2024
       - key: JWT_EXPIRES_IN
