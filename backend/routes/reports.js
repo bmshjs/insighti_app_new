@@ -221,7 +221,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
       }
     }
 
-    res.json({
+    const jsonPayload = {
       success: true,
       message: successMessage,
       filename: pdfResult.filename,
@@ -229,7 +229,12 @@ router.post('/generate', authenticateToken, async (req, res) => {
       download_url: `/api/reports/download/${pdfResult.filename}`,
       size: pdfResult.size,
       case_id: data.defects.length > 0 ? data.defects[0].case_id : null
-    });
+    };
+    if (template === 'final-report' || template === 'final-report-values') {
+      jsonPayload.household_defect_count = reportData.defects?.length ?? 0;
+      jsonPayload.visual_inspection_count = reportData.visual_inspections?.length ?? 0;
+    }
+    res.json(jsonPayload);
   } catch (error) {
     console.error('PDF generation error:', error);
     res.status(500).json({
@@ -610,7 +615,8 @@ async function loadHouseholdReportData(householdId) {
     : (household.phone || '');
 
   const defectsResult = await pool.query(
-    `SELECT d.id, d.case_id, d.location, d.trade, d.content, d.memo, d.created_at,
+    `SELECT d.id, d.case_id, d.location, d.trade, d.content, d.memo,
+            d.photo_near, d.photo_far, d.created_at,
             c.type as case_type, c.created_at as case_created_at
      FROM defect d
      JOIN case_header c ON d.case_id = c.id
@@ -648,6 +654,12 @@ async function loadHouseholdReportData(householdId) {
       [defect.id]
     );
     defect.photos = photoResult.rows || [];
+    if (defect.photo_far && !defect.photos.some((p) => p.kind === 'far')) {
+      defect.photos.push({ kind: 'far', url: defect.photo_far });
+    }
+    if (defect.photo_near && !defect.photos.some((p) => p.kind === 'near')) {
+      defect.photos.push({ kind: 'near', url: defect.photo_near });
+    }
 
     const itemResult = await pool.query(inspectionItemQuery, [defect.id]);
     const air = [], radon = [], level = [], thermal = [], visual = [];

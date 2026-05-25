@@ -77,9 +77,15 @@ function truncateToFit(text) {
   return s === '-' || !s ? s : String(s);
 }
 
-/** 세대주 등록 하자 사진 → 육안 블록 [근거리, 원거리] 순 */
-function defectPhotosToVisualPhotos(defectPhotos) {
-  const list = Array.isArray(defectPhotos) ? defectPhotos : [];
+/** 세대주 등록 하자 사진 → 육안 블록 [근거리, 원거리] 순 (photo 테이블 + defect.photo_near/far) */
+function defectPhotosToVisualPhotos(defect) {
+  const list = Array.isArray(defect.photos) ? [...defect.photos] : [];
+  if (defect.photo_far && !list.some((p) => p.kind === 'far')) {
+    list.push({ kind: 'far', url: defect.photo_far });
+  }
+  if (defect.photo_near && !list.some((p) => p.kind === 'near')) {
+    list.push({ kind: 'near', url: defect.photo_near });
+  }
   const photos = [];
   const far = list.find((p) => p.kind === 'far');
   const near = list.find((p) => p.kind === 'near');
@@ -98,11 +104,11 @@ function defectPhotosToVisualPhotos(defectPhotos) {
 /** 세대주 등록 하자 1건 → 8p 육안 블록 항목 */
 function defectToVisualItem(defect) {
   return {
-    location: defect.location,
-    trade: defect.trade,
+    location: defect.location || '',
+    trade: defect.trade || '',
     note: defect.content || '',
     result_text: defect.memo || '',
-    photos: defectPhotosToVisualPhotos(defect.photos)
+    photos: defectPhotosToVisualPhotos(defect)
   };
 }
 
@@ -132,17 +138,39 @@ function visualItemHeight(item, block) {
   return rowH * 3 + photoH + block.blockGap;
 }
 
+function resolveKoreanFontPath() {
+  const candidates = [
+    path.join(FONTS_DIR, 'NotoSansKR-Regular.ttf'),
+    path.join(FONTS_DIR, 'NotoSansCJKkr-Regular.otf'),
+    path.join(__dirname, '..', 'node_modules', '@fontsource', 'noto-sans-kr', 'files', 'noto-sans-kr-korean-400-normal.woff2')
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p) && fs.statSync(p).size > 10000) return p;
+  }
+  if (fs.existsSync(FONTS_DIR)) {
+    const found = fs.readdirSync(FONTS_DIR).find((f) => /\.(ttf|otf|woff2)$/i.test(f));
+    if (found) return path.join(FONTS_DIR, found);
+  }
+  const fontsourceDir = path.join(__dirname, '..', 'node_modules', '@fontsource', 'noto-sans-kr', 'files');
+  if (fs.existsSync(fontsourceDir)) {
+    const kr = fs.readdirSync(fontsourceDir).find((f) => /korean.*400.*\.woff2$/i.test(f));
+    if (kr) return path.join(fontsourceDir, kr);
+  }
+  return null;
+}
+
 async function embedCustomFont(pdfDoc) {
   try {
     const fontkit = require('@pdf-lib/fontkit');
     pdfDoc.registerFontkit(fontkit);
-    const ttfPath = path.join(FONTS_DIR, 'NotoSansKR-Regular.ttf');
-    if (fs.existsSync(ttfPath)) {
-      const fontBytes = fs.readFileSync(ttfPath);
+    const fontPath = resolveKoreanFontPath();
+    if (fontPath) {
+      const fontBytes = fs.readFileSync(fontPath);
       return await pdfDoc.embedFont(fontBytes);
     }
+    console.warn('[finalReport] Korean font not found — install fonts/ or run scripts/ensure-korean-font.js');
   } catch (e) {
-    //
+    console.warn('[finalReport] Korean font embed failed:', e.message);
   }
   return await pdfDoc.embedFont(StandardFonts.Helvetica);
 }
