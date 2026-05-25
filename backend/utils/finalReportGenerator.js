@@ -77,6 +77,61 @@ function truncateToFit(text) {
   return s === '-' || !s ? s : String(s);
 }
 
+/** 세대주 등록 하자 사진 → 육안 블록 [근거리, 원거리] 순 */
+function defectPhotosToVisualPhotos(defectPhotos) {
+  const list = Array.isArray(defectPhotos) ? defectPhotos : [];
+  const photos = [];
+  const far = list.find((p) => p.kind === 'far');
+  const near = list.find((p) => p.kind === 'near');
+  const pushPhoto = (p) => {
+    const url = p.url || p.thumb_url || p.file_url;
+    if (url) photos.push({ file_url: url, url });
+  };
+  if (far) pushPhoto(far);
+  if (near) pushPhoto(near);
+  list.forEach((p) => {
+    if (p !== far && p !== near) pushPhoto(p);
+  });
+  return photos;
+}
+
+/** 세대주 등록 하자 1건 → 8p 육안 블록 항목 */
+function defectToVisualItem(defect) {
+  return {
+    location: defect.location,
+    trade: defect.trade,
+    note: defect.content || '',
+    result_text: defect.memo || '',
+    photos: defectPhotosToVisualPhotos(defect.photos)
+  };
+}
+
+/**
+ * 8p 육안: 세대주 등록 하자 → 점검원 육안점검 순서
+ */
+function getVisualPageItems(reportData) {
+  const items = [];
+  const defects = reportData.defects || [];
+  const inspections = reportData.visual_inspections || [];
+  if (defects.length > 0) {
+    items.push({ _sectionHeader: true, title: '세대주 등록 하자' });
+    defects.forEach((d) => items.push(defectToVisualItem(d)));
+  }
+  if (inspections.length > 0) {
+    items.push({ _sectionHeader: true, title: '점검원 육안점검' });
+    inspections.forEach((i) => items.push(i));
+  }
+  return items;
+}
+
+/** 항목 1개(또는 구역 제목)가 차지하는 세로 높이 */
+function visualItemHeight(item, block) {
+  if (item && item._sectionHeader) return 26;
+  const rowH = block.rowHeight;
+  const photoH = block.photoHeight;
+  return rowH * 3 + photoH + block.blockGap;
+}
+
 async function embedCustomFont(pdfDoc) {
   try {
     const fontkit = require('@pdf-lib/fontkit');
@@ -265,11 +320,24 @@ async function drawVisualBlocksOnPage(pdfDoc, page, font, reportData, chunk) {
 
   const blockHeight = rowH * 3 + photoH;
   const totalBlockH = blockHeight + gap;
-  const startY = block.origin.y;
+  let cursorY = block.origin.y;
 
   for (let idx = 0; idx < chunk.length; idx++) {
     const item = chunk[idx];
-    const by = startY - idx * totalBlockH;
+    if (item._sectionHeader) {
+      cursorY -= 20;
+      page.drawText(item.title, {
+        x: ox,
+        y: cursorY,
+        size: 10,
+        font,
+        color: rgb(0.15, 0.15, 0.15)
+      });
+      cursorY -= 6;
+      continue;
+    }
+    const by = cursorY;
+    cursorY -= totalBlockH;
     const locVal = safeText(item.location);
     const tradeVal = safeText(item.trade);
     const defectVal = safeText(item.note);
@@ -400,21 +468,29 @@ async function drawVisualBlocksOnPage(pdfDoc, page, font, reportData, chunk) {
   }
 }
 
-/** 육안점검: 갯수/페이지 제한 없이 모든 항목 블록 그리기. 필요 시 추가 페이지 삽입. 사용한 페이지 수 반환. */
+/** 육안점검: 세대주 하자 → 점검원 육안 순. 항목 많으면 추가 페이지 삽입. 사용한 페이지 수 반환. */
 async function drawVisualTablePages(pdfDoc, slotIndex, font, reportData) {
-  const items = reportData.visual_inspections || [];
+  const items = getVisualPageItems(reportData);
   const block = LAYOUT.VISUAL_BLOCK;
-  const rowH = block.rowHeight;
-  const photoH = block.photoHeight;
-  const gap = block.blockGap;
-  const blockHeight = rowH * 3 + photoH;
-  const totalBlockH = blockHeight + gap;
-  const maxBlocks = Math.max(1, Math.floor((block.origin.y - 80) / totalBlockH));
+  const pageTop = block.origin.y;
+  const pageBottom = 80;
   const initialSlot = slotIndex;
   let offset = 0;
   let page = pdfDoc.getPages()[slotIndex];
-  while (true) {
-    const chunk = items.slice(offset, offset + maxBlocks);
+  while (offset < items.length) {
+    let used = 0;
+    const chunk = [];
+    for (let i = offset; i < items.length; i++) {
+      const h = visualItemHeight(items[i], block);
+      if (chunk.length > 0 && used + h > pageTop - pageBottom) break;
+      if (chunk.length === 0 && h > pageTop - pageBottom) {
+        chunk.push(items[i]);
+        used += h;
+        break;
+      }
+      chunk.push(items[i]);
+      used += h;
+    }
     await drawVisualBlocksOnPage(pdfDoc, page, font, reportData, chunk);
     offset += chunk.length;
     if (offset >= items.length) break;
@@ -1194,6 +1270,8 @@ async function generateFinalReportValues(reportData, options = {}) {
 module.exports = {
   generateFinalReport,
   generateFinalReportValues,
+  getVisualPageItems,
+  defectToVisualItem,
   TEMPLATE_FILENAME,
   FILL_PAGE_INDICES: [7, 9, 11, 12]
 };
