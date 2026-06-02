@@ -194,7 +194,7 @@ function getVisualPageItems(reportData) {
 
   if (defects.length > 0) {
     items.push({ _sectionHeader: true, title: '세대주 등록 하자' });
-    defects.forEach((d) => items.push(defectToVisualItem(d)));
+    defects.forEach((d) => items.push({ ...defectToVisualItem(d), _source: '세대주' }));
   }
   if (inspections.length > 0) {
     items.push({ _sectionHeader: true, title: '점검원 육안점검' });
@@ -205,7 +205,8 @@ function getVisualPageItems(reportData) {
         trade: i.trade || '',
         note: i.note || '',
         result_text: i.result_text ?? i.result ?? '',
-        photos: normalizePhotoList(i.photos)
+        photos: normalizePhotoList(i.photos),
+        _source: '점검원'
       });
     });
   }
@@ -510,6 +511,16 @@ async function drawVisualBlocksOnPage(pdfDoc, page, font, reportData, chunk) {
     if (url1) await embedAndDrawPhoto(pdfDoc, page, url1, ox + halfW + 2, photoY + 2, halfW - 4, photoH - 4);
     if (!url0) page.drawText('근거리', { x: ox + halfW / 2 - 15, y: photoY + photoH / 2 - 4, size: 9, font });
     if (!url1) page.drawText('원거리', { x: ox + halfW + halfW / 2 - 15, y: photoY + photoH / 2 - 4, size: 9, font });
+    // 사진 출처(세대주/점검원) 표기 — 사진 영역 좌상단
+    if (item._source) {
+      page.drawText(`[${item._source} 등록 사진]`, {
+        x: ox + 3,
+        y: photoY + photoH - 11,
+        size: 7,
+        font,
+        color: rgb(0.2, 0.2, 0.2)
+      });
+    }
 
     // 3) 공종/하자내용 행: [공 종][값][하자내용][값] — 하자내용 한글 10자, 글자축소
     const row2Y = photoY - rowH;

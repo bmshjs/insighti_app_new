@@ -774,6 +774,91 @@ class PDFMakeGenerator {
     };
   }
 
+  /** 사진 URL(/uploads/xxx, uploads/xxx, http(s)://host/uploads/xxx) → 서버 내 절대 경로. 없으면 null */
+  _resolvePhotoPath(url) {
+    if (!url || typeof url !== 'string') return null;
+    let rel = url.trim();
+    const m = rel.match(/^https?:\/\/[^/]+(\/.+)$/i);
+    if (m) rel = m[1];
+    rel = rel.replace(/^\//, '');
+    if (!rel) return null;
+    const full = path.join(__dirname, '..', rel);
+    if (fs.existsSync(full)) return full;
+    const baseName = path.basename(rel);
+    const alt = path.join(__dirname, '..', 'uploads', baseName);
+    if (baseName && fs.existsSync(alt)) return alt;
+    return null;
+  }
+
+  /**
+   * 육안점검 블록의 왼쪽 사진 컬럼 stack 생성: 세대주 등록 사진 + 점검원 등록 사진을 한 컬럼에 모두 출력
+   * @param {Array} defectPhotos - 세대주(입주자)가 등록한 사진 (photo 테이블)
+   * @param {Array} inspectorVisualItems - 점검원 육안 점검 항목 배열 (각 item.photos 사용)
+   */
+  _buildVisualPhotoColumn(defectPhotos, inspectorVisualItems) {
+    const col = [];
+    // 세대주(입주자) 등록 사진
+    (defectPhotos || []).forEach((photo) => {
+      const photoPath = this._resolvePhotoPath(photo.url || photo.file_url || photo.thumb_url);
+      if (photoPath) {
+        const kindLabel = photo.kind === 'near' ? '근접' : photo.kind === 'far' ? '원거리' : '사진';
+        col.push({ image: photoPath, width: 140, margin: [0, 0, 0, 2] });
+        col.push({ text: `[세대주] ${kindLabel}`, fontSize: 8, color: '#666', margin: [0, 0, 0, 6] });
+      }
+    });
+    // 점검원 등록 사진
+    (inspectorVisualItems || []).forEach((v) => {
+      (v.photos || []).forEach((photo, pi) => {
+        const photoPath = this._resolvePhotoPath(photo.file_url || photo.url || photo.thumb_url);
+        if (photoPath) {
+          col.push({ image: photoPath, width: 140, margin: [0, 0, 0, 2] });
+          col.push({ text: `[점검원] ${photo.caption || `사진 ${pi + 1}`}`, fontSize: 8, color: '#1565c0', margin: [0, 0, 0, 6] });
+        }
+      });
+    });
+    return col.length ? col : [{ text: '(사진 없음)', fontSize: 9, color: '#999' }];
+  }
+
+  /**
+   * 점검원 육안점검 항목들을 각각 별도 블록(왼쪽 점검원 사진 + 오른쪽 점검의견)으로 content에 추가
+   * @param {Array} content - pdfmake content 배열
+   * @param {Array} visualItems - 점검원 육안 점검 항목 배열
+   * @param {string|null} sectionTitle - 섹션 제목(있으면 헤더 출력)
+   */
+  _pushInspectorVisualBlocks(content, visualItems, sectionTitle) {
+    const items = (visualItems || []);
+    if (items.length === 0) return;
+    if (sectionTitle) {
+      content.push({ text: sectionTitle, style: 'defectHeader', margin: [0, 10, 0, 6] });
+    }
+    items.forEach((v, vi) => {
+      const rightStack = [
+        { text: `육안점검 (점검원)${items.length > 1 ? ` #${vi + 1}` : ''}`, fontSize: 11, bold: true, margin: [0, 0, 0, 6] },
+        { text: `위치: ${v.location || '-'}`, fontSize: 10, margin: [0, 0, 0, 2] },
+        { text: `공종: ${v.trade || '-'}`, fontSize: 10, margin: [0, 0, 0, 2] },
+        { text: `점검의견: ${v.note || '-'}`, fontSize: 10, margin: [0, 0, 0, 2] },
+        { text: `결과: ${v.result_text || v.result || '-'}`, fontSize: 10 }
+      ];
+      const leftCol = this._buildVisualPhotoColumn([], [v]);
+      content.push(this._buildVisualBlock(leftCol, rightStack));
+    });
+  }
+
+  /** 육안점검 블록(왼쪽 사진 컬럼 + 오른쪽 빨간 박스) 테이블 노드 생성 */
+  _buildVisualBlock(leftCol, rightStack) {
+    return {
+      table: {
+        widths: [160, '*'],
+        body: [[
+          { stack: leftCol, border: [false, false, false, false] },
+          { stack: rightStack, fillColor: '#ffebee', border: [true, true, true, true], margin: [8, 8] }
+        ]]
+      },
+      layout: 'noBorders',
+      margin: [0, 0, 0, 12]
+    };
+  }
+
   buildInspectionFormDefinition(data) {
     const content = [];
     const createdDate = data.defects && data.defects.length > 0
@@ -794,9 +879,18 @@ class PDFMakeGenerator {
       { text: `점검일: ${this.formatDate(createdDate)}`, fontSize: 11 }
     ]));
 
+    // 세대 단위(defect_id NULL)로 저장된 점검원 육안점검 — 하자와 1:1로 묶이지 않은 점검결과
+    const hh = data.household_inspections || {};
+    const householdVisual = (hh.visual || []).filter((v) => !v.defect_id);
+
     const defects = data.defects || [];
     if (defects.length === 0) {
-      content.push(this._redBox({ text: '등록된 하자가 없습니다.', alignment: 'center' }));
+      // 하자는 없지만 세대 단위 점검원 육안점검이 있으면 점검원 육안점검 블록으로 출력
+      if (householdVisual.length > 0) {
+        this._pushInspectorVisualBlocks(content, householdVisual, '점검원 육안점검 (세대)');
+      } else {
+        content.push(this._redBox({ text: '등록된 하자가 없습니다.', alignment: 'center' }));
+      }
       return this._getDocumentDefinition(content);
     }
 
@@ -815,44 +909,22 @@ class PDFMakeGenerator {
         margin: [0, 16, 0, 8]
       });
 
-      // 2p 스타일: 육안점검 — 왼쪽 사진, 오른쪽 빨간박스 점검내용 (점검원 점검의견 포함)
-      const hasVisualPhotos = defect.photos && defect.photos.length > 0;
-      const visualNoteText = visualItems.length > 0
-        ? visualItems.map((v) => v.note || '').filter(Boolean).join(' / ') || '-'
-        : '-';
-      const visualContent = [
-        { text: '육안점검', fontSize: 11, bold: true, margin: [0, 0, 0, 6] },
+      // 육안점검 — 세대주 사진과 점검원 사진을 서로 다른 블록으로 분리 출력
+      // 1) 세대주 육안점검 블록: 왼쪽 세대주 사진, 오른쪽 빨간박스(세대주 하자 정보)
+      const ownerVisualContent = [
+        { text: '육안점검 (세대주)', fontSize: 11, bold: true, margin: [0, 0, 0, 6] },
         { text: `위치: ${defect.location || '-'}`, fontSize: 10, margin: [0, 0, 0, 2] },
         { text: `공종: ${defect.trade || '-'}`, fontSize: 10, margin: [0, 0, 0, 2] },
         { text: `내용: ${defect.content || '-'}`, fontSize: 10, margin: [0, 0, 0, 2] },
-        { text: `특이사항(메모): ${defect.memo || '-'}`, fontSize: 10, margin: [0, 0, 0, 2] },
-        { text: `점검의견: ${visualNoteText}`, fontSize: 10 }
+        { text: `특이사항(메모): ${defect.memo || '-'}`, fontSize: 10 }
       ];
-      if (hasVisualPhotos) {
-        const leftCol = [];
-        defect.photos.forEach((photo) => {
-          try {
-            const urlPath = (photo.url || '').replace(/^\//, '');
-            const photoPath = path.join(__dirname, '..', urlPath);
-            if (fs.existsSync(photoPath)) {
-              leftCol.push({ image: photoPath, width: 140, margin: [0, 0, 0, 4] });
-              leftCol.push({ text: photo.kind === 'near' ? '근접' : photo.kind === 'far' ? '원거리' : '사진', fontSize: 8, color: '#666' });
-            }
-          } catch (e) { /* ignore */ }
-        });
-        content.push({
-          table: {
-            widths: [160, '*'],
-            body: [[
-              { stack: leftCol.length ? leftCol : [{ text: '(사진 없음)', fontSize: 9, color: '#999' }], border: [false, false, false, false] },
-              { stack: visualContent, fillColor: '#ffebee', border: [true, true, true, true], margin: [8, 8] }
-            ]]
-          },
-          layout: 'noBorders',
-          margin: [0, 0, 0, 12]
-        });
-      } else {
-        content.push(this._redBox(visualContent));
+      content.push(this._buildVisualBlock(this._buildVisualPhotoColumn(defect.photos, []), ownerVisualContent));
+
+      // 2) 점검원 육안점검 블록: 왼쪽 점검원 사진, 오른쪽 빨간박스(점검의견)
+      //    세대 단위(defect_id NULL) 점검원 육안점검은 특정 하자에 묶이지 않으므로 첫 하자 다음에 함께 출력
+      this._pushInspectorVisualBlocks(content, visualItems, null);
+      if (di === 0 && householdVisual.length > 0) {
+        this._pushInspectorVisualBlocks(content, householdVisual, null);
       }
 
       // 3p 스타일: 열화상점검 — 왼쪽 사진, 오른쪽 빨간박스

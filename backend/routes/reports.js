@@ -202,6 +202,9 @@ router.post('/generate', authenticateToken, async (req, res) => {
       const ho = reportData.ho || '';
       const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 12);
       const filename = `점검결과양식_${dong}-${ho}_${timestamp}.pdf`;
+      // 세대 단위(defect_id NULL)로 저장된 점검원 점검결과도 함께 출력하기 위해 로드
+      const householdInsp = await loadHouseholdInspectionsForReport(householdId);
+      reportData.household_inspections = householdInsp;
       pdfResult = await pdfGenerator.generateInspectionFormPDF(reportData, { filename });
     } else {
       const filename = `report-${householdId}-${Date.now()}.pdf`;
@@ -492,7 +495,7 @@ function getResultText(result) {
 async function loadHouseholdInspectionsForReport(householdId) {
   const query = `
     SELECT
-      ii.id, ii.type, ii.location, ii.trade, ii.serial_no, ii.note, ii.result, ii.created_at,
+      ii.id, ii.type, ii.defect_id, ii.location, ii.trade, ii.serial_no, ii.note, ii.result, ii.created_at,
       am.process_type, am.tvoc, am.hcho, am.co2, am.unit_tvoc, am.unit_hcho,
       rm.radon, rm.unit_radon,
       lm.left_mm, lm.right_mm,
@@ -514,6 +517,7 @@ async function loadHouseholdInspectionsForReport(householdId) {
   const visual = [], thermal = [], air = [], radon = [], level = [];
   (result.rows || []).forEach((row) => {
     const base = {
+      defect_id: row.defect_id,
       location: row.location,
       trade: row.trade,
       serial_no: row.serial_no,
