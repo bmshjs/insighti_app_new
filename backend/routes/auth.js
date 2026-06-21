@@ -29,9 +29,9 @@ router.post('/session', async (req, res) => {
       return res.status(400).json({ error: '아파트명, 동, 호수를 입력해 주세요.' });
     }
 
-    // Complex 찾기 또는 생성
+    // Complex 찾기 또는 생성 (대소문자·공백 무시 — 점검원 admin 계정 대응)
     let complexResult = await pool.query(
-      'SELECT id FROM complex WHERE name = $1',
+      'SELECT id, name FROM complex WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))',
       [complex]
     );
     

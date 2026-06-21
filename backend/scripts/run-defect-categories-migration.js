@@ -18,21 +18,22 @@ for (const p of envCandidates) {
 }
 const { Client } = require('pg');
 
+const { resolveDatabaseUrl, getPoolSslConfig } = require('../utils/databaseUrl');
+
 function getDatabaseUrl() {
-  const u = process.env.DATABASE_URL && process.env.DATABASE_URL.trim();
-  if (!u) {
-    console.error('❌ DATABASE_URL이 없습니다. backend/.env 또는 프로젝트 루트 .env를 설정하세요.');
+  const url = resolveDatabaseUrl();
+  if (!url) {
+    console.error('❌ DATABASE_URL이 없습니다. backend/.env 또는 DB_HOST/DB_USER/DB_NAME을 설정하세요.');
     process.exit(1);
   }
-  return u;
+  return url;
 }
 
 async function migrate() {
   const url = getDatabaseUrl();
-  const isLocalhost = url.includes('localhost') || url.includes('127.0.0.1');
   const client = new Client({
     connectionString: url,
-    ssl: isLocalhost ? false : { rejectUnauthorized: false }
+    ssl: getPoolSslConfig(url),
   });
 
   const sqlPath = path.join(__dirname, '../../db/migrations/002_defect_categories.sql');

@@ -1,3 +1,10 @@
+databases:
+  - name: insighti-postgres
+    databaseName: insighti_db
+    user: insighti_user
+    plan: free
+    region: singapore
+
 services:
   - type: web
     name: mobile_app_new
@@ -13,6 +20,8 @@ services:
         value: production
       - key: PORT
         value: 10000
+      - key: RENDER_REGION
+        value: singapore
       - key: BACKEND_URL
         value: https://insighti-app-new.onrender.com
       - key: UPLOAD_DIR
@@ -21,3 +30,7 @@ services:
         value: insighti-super-secret-key-2024
       - key: JWT_EXPIRES_IN
         value: 3d
+      - key: DATABASE_URL
+        fromDatabase:
+          name: insighti-postgres
+          property: connectionString

@@ -155,13 +155,30 @@ app.get('/', (req, res) => {
   });
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+// Health check endpoint (?db=1 이면 DB 연결 상태 포함)
+app.get('/health', async (req, res) => {
+  const payload = {
+    status: 'OK',
     timestamp: new Date().toISOString(),
-    version: '4.0.2'
-  });
+    version: '4.0.3',
+  };
+
+  if (req.query.db === '1') {
+    try {
+      const pool = require('./database');
+      await pool.query('SELECT 1 AS ok');
+      payload.database = 'connected';
+    } catch (error) {
+      return res.status(503).json({
+        ...payload,
+        status: 'DEGRADED',
+        database: 'disconnected',
+        error: error.message,
+      });
+    }
+  }
+
+  res.json(payload);
 });
 
 // API documentation endpoint
@@ -208,31 +225,44 @@ console.log(`📊 DATABASE_URL: ${process.env.DATABASE_URL ? 'Set' : 'Not set'}`
 // Start server with error handling
 const pool = require('./database');
 const { ensureInspectorHousehold } = require('./utils/ensureInspectorHousehold');
+const { bootstrapDatabase } = require('./utils/bootstrapDatabase');
 
-let server;
-try {
-  server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📚 API Documentation: http://localhost:${PORT}/api`);
-    console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
-    console.log(`✅ Server is ready to accept connections`);
-    console.log(`🌐 Server listening on 0.0.0.0:${PORT}`);
-    ensureInspectorHousehold(pool).catch(() => {});
-  });
-} catch (error) {
-  console.error('❌ Failed to start server:', error);
-  console.error('Error stack:', error.stack);
-  process.exit(1);
+async function prepareDatabase() {
+  const bootstrap = await bootstrapDatabase(pool);
+  if (!bootstrap.ok) {
+    console.warn('[startup] DB bootstrap failed:', bootstrap.reason);
+  }
+  await ensureInspectorHousehold(pool);
 }
 
-// Handle server errors
-server.on('error', (error) => {
-  console.error('❌ Server error:', error);
-  if (error.code === 'EADDRINUSE') {
-    console.error(`❌ Port ${PORT} is already in use`);
-  }
-  process.exit(1);
-});
+let server;
+prepareDatabase()
+  .catch((error) => {
+    console.warn('[startup] DB prepare error:', error.message);
+  })
+  .finally(() => {
+    try {
+      server = app.listen(PORT, '0.0.0.0', () => {
+        console.log(`🚀 Server running on port ${PORT}`);
+        console.log(`📚 API Documentation: http://localhost:${PORT}/api`);
+        console.log(`🏥 Health Check: http://localhost:${PORT}/health?db=1`);
+        console.log(`✅ Server is ready to accept connections`);
+        console.log(`🌐 Server listening on 0.0.0.0:${PORT}`);
+      });
+    } catch (error) {
+      console.error('❌ Failed to start server:', error);
+      console.error('Error stack:', error.stack);
+      process.exit(1);
+    }
+
+    server.on('error', (error) => {
+      console.error('❌ Server error:', error);
+      if (error.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${PORT} is already in use`);
+      }
+      process.exit(1);
+    });
+  });
 
 // Handle uncaught errors
 process.on('uncaughtException', (error) => {

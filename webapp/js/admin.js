@@ -3,8 +3,13 @@ const $ = (q) => document.querySelector(q);
 const $$ = (q) => document.querySelectorAll(q);
 
 // API Base URL
-const API_BASE = window.location.hostname === 'localhost' 
-  ? 'http://localhost:3000' 
+const isLocalDev =
+  window.location.protocol === 'file:' ||
+  !window.location.hostname ||
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1';
+const API_BASE = isLocalDev
+  ? 'http://localhost:3000'
   : 'https://insighti-app-new.onrender.com';
 
 // Admin State

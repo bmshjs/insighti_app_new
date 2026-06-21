@@ -1,22 +1,24 @@
 // Simple PostgreSQL connection
 const { Pool } = require('pg');
 const config = require('./config');
+const {
+  resolveDatabaseUrl,
+  getPoolSslConfig,
+} = require('./utils/databaseUrl');
 
-// Use DATABASE_URL if available (Render provides this), otherwise use individual config
+const connectionString = resolveDatabaseUrl();
 let pool;
 
-if (process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '') {
-  // Production: Use DATABASE_URL from Render
+if (connectionString) {
   console.log('📊 Using DATABASE_URL for connection');
   pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
+    connectionString,
+    ssl: getPoolSslConfig(connectionString),
     max: 20,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    connectionTimeoutMillis: 15000,
   });
 } else {
-  // Development: Use individual config
   console.log('📊 Using config file for connection');
   pool = new Pool({
     host: config.database.host,
@@ -26,28 +28,37 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '') {
     password: config.database.password,
     max: 20,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    connectionTimeoutMillis: 15000,
     ssl: false,
   });
 }
 
-// Test connection immediately
+async function verifyDatabaseConnection() {
+  const client = await pool.connect();
+  try {
+    await client.query('SELECT 1 AS ok');
+  } finally {
+    client.release();
+  }
+}
+
 pool.connect((err, client, release) => {
   if (err) {
-    console.error('❌ Database connection failed:', err);
+    console.error('❌ Database connection failed:', err.message);
+    console.error('   DATABASE_URL 호스트가 dpg-xxx-a 형태만 있으면 .singapore-postgres.render.com 이 붙는지 확인하세요.');
   } else {
     console.log('✅ Database connected successfully');
     release();
   }
 });
 
-// Test connection
 pool.on('connect', () => {
   console.log('✅ Database connected');
 });
 
 pool.on('error', (err) => {
-  console.error('❌ Database connection error:', err);
+  console.error('❌ Database connection error:', err.message);
 });
 
 module.exports = pool;
+module.exports.verifyDatabaseConnection = verifyDatabaseConnection;

@@ -1,11 +1,23 @@
 // API client for backend integration
+function resolveApiBaseUrl() {
+  const hostname = window.location.hostname;
+  const protocol = window.location.protocol;
+  const isLocalDev =
+    protocol === 'file:' ||
+    !hostname ||
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1';
+
+  if (isLocalDev) {
+    return 'http://localhost:3000/api';
+  }
+
+  return 'https://insighti-app-new.onrender.com/api';
+}
+
 class APIClient {
   constructor() {
-    // 환경에 따라 API URL 동적 설정
-    const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    this.baseURL = isDevelopment 
-      ? 'http://localhost:3000/api'
-      : 'https://insighti-app-new.onrender.com/api'; // Render backend domain
+    this.baseURL = resolveApiBaseUrl();
     this.token = localStorage.getItem('insighti_token');
     console.log('API Base URL:', this.baseURL);
   }

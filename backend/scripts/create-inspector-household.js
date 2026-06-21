@@ -10,18 +10,19 @@
  *     (Render DB는 보통 Render 내부에서만 접근 가능하므로, Render Shell에서 실행하거나
  *      대시보드에서 해당 서비스 → Shell → cd backend && npm run create-inspector)
  */
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env'), override: true });
 const { Pool } = require('pg');
+const { resolveDatabaseUrl, getPoolSslConfig } = require('../utils/databaseUrl');
 
-const MIGRATE_DB_FALLBACK =
-  'postgresql://insighti_user:2eq3v151vjtJ2wUz4PUUQ2VHhlTbjWRy@dpg-d3kardu3jp1c73b2dkrg-a.singapore-postgres.render.com/insighti_db_yckk';
+const connectionString = resolveDatabaseUrl();
+if (!connectionString) {
+  console.error('❌ DATABASE_URL 또는 DB_HOST/DB_USER/DB_NAME 설정이 필요합니다.');
+  process.exit(1);
+}
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || MIGRATE_DB_FALLBACK,
-  ssl:
-    (process.env.DATABASE_URL || MIGRATE_DB_FALLBACK).includes('render.com')
-      ? { rejectUnauthorized: false }
-      : undefined
+  connectionString,
+  ssl: getPoolSslConfig(connectionString),
 });
 
 const INSPECTOR_COMPLEX = 'admin';
