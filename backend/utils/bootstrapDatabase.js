@@ -17,11 +17,16 @@ async function tableExists(client, tableName) {
 
 async function runSqlFile(client, relativePath) {
   const sqlPath = path.join(__dirname, '..', relativePath);
+  if (!fs.existsSync(sqlPath)) {
+    console.warn(`[bootstrap] skip missing file: ${relativePath}`);
+    return;
+  }
+
   const sql = fs.readFileSync(sqlPath, 'utf8');
   const statements = sql
-    .split(';')
-    .map((stmt) => stmt.trim())
-    .filter((stmt) => stmt.length > 0 && !stmt.startsWith('--'));
+    .split(/;\s*\r?\n/)
+    .map((stmt) => stmt.replace(/--[^\n]*/g, '').trim())
+    .filter((stmt) => stmt.length > 0);
 
   for (const statement of statements) {
     try {
@@ -31,7 +36,8 @@ async function runSqlFile(client, relativePath) {
       if (
         msg.includes('already exists') ||
         msg.includes('duplicate key') ||
-        msg.includes('duplicate_object')
+        msg.includes('duplicate_object') ||
+        msg.includes('does not exist') && msg.includes('constraint')
       ) {
         continue;
       }
@@ -45,28 +51,30 @@ async function bootstrapDatabase(pool) {
     return { ok: false, reason: 'pool missing' };
   }
 
+  const migrationFiles = [
+    'scripts/init-db.sql',
+    'scripts/ensure-core-schema.sql',
+    'scripts/migrate-phase1.sql',
+    'scripts/migrate-inspector-registration.sql',
+    'scripts/migrate-encrypt-personal-data.sql',
+    'scripts/migrate-inspection-photos.sql',
+    'scripts/migrate-push-notifications.sql',
+    '../../db/migrations/001_pdf_form_columns.sql',
+    '../../db/migrations/002_defect_categories.sql',
+  ];
+
   let client;
   try {
     client = await pool.connect();
 
     const hasComplex = await tableExists(client, 'complex');
     if (!hasComplex) {
-      console.log('[bootstrap] core schema initializing...');
-      await runSqlFile(client, 'scripts/init-db.sql');
-      console.log('[bootstrap] core schema ready');
+      console.log('[bootstrap] fresh database detected, applying schema...');
     }
 
-    const hasDefectCategories = await tableExists(client, 'defect_categories');
-    if (!hasDefectCategories) {
-      console.log('[bootstrap] defect_categories migration running...');
-      await runSqlFile(client, '../../db/migrations/002_defect_categories.sql');
-      console.log('[bootstrap] defect_categories ready');
-    } else {
-      const countResult = await client.query('SELECT COUNT(*)::int AS cnt FROM defect_categories');
-      if (countResult.rows[0].cnt === 0) {
-        console.log('[bootstrap] defect_categories empty, seeding...');
-        await runSqlFile(client, '../../db/migrations/002_defect_categories.sql');
-      }
+    for (const file of migrationFiles) {
+      console.log(`[bootstrap] running ${file}`);
+      await runSqlFile(client, file);
     }
 
     return { ok: true };
