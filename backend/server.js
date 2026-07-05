@@ -151,7 +151,7 @@ app.get('/', (req, res) => {
     status: 'OK', 
     message: 'InsightI API Server is running',
     timestamp: new Date().toISOString(),
-    version: '4.0.8'
+    version: '4.0.9'
   });
 });
 
@@ -160,7 +160,7 @@ app.get('/health', async (req, res) => {
   const payload = {
     status: 'OK',
     timestamp: new Date().toISOString(),
-    version: '4.0.8',
+    version: '4.0.9',
   };
 
   if (req.query.db === '1') {
@@ -193,7 +193,7 @@ app.get('/health', async (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     name: 'InsightI Pre/Post Inspection API',
-    version: '4.0.8', // Error handling improvements
+    version: '4.0.9', // Error handling improvements
     endpoints: {
       auth: '/api/auth',
       cases: '/api/cases',

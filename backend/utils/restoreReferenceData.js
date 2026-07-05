@@ -44,11 +44,11 @@ async function restoreSampleCasesAndDefects(client) {
       `UPDATE case_header SET household_id = $1 WHERE id = 'CASE-24001'`,
       [household1Id]
     );
+    await client.query(`DELETE FROM defect WHERE id IN ('DEF-1', 'DEF-2')`);
     await client.query(
       `INSERT INTO defect (id, case_id, location, trade, content, memo) VALUES
         ('DEF-1', 'CASE-24001', '거실', '바닥재', '마루판 들뜸', '현장 확인 필요'),
-        ('DEF-2', 'CASE-24001', '주방', '타일', '타일 균열', '')
-       ON CONFLICT (id) DO NOTHING`
+        ('DEF-2', 'CASE-24001', '주방', '타일', '타일 균열', '')`
     );
   }
   if (household2Id) {
@@ -62,10 +62,10 @@ async function restoreSampleCasesAndDefects(client) {
       `UPDATE case_header SET household_id = $1 WHERE id = 'CASE-24002'`,
       [household2Id]
     );
+    await client.query(`DELETE FROM defect WHERE id = 'DEF-3'`);
     await client.query(
       `INSERT INTO defect (id, case_id, location, trade, content, memo) VALUES
-        ('DEF-3', 'CASE-24002', '욕실', '도장', '페인트 벗겨짐', '습기 문제 의심')
-       ON CONFLICT (id) DO NOTHING`
+        ('DEF-3', 'CASE-24002', '욕실', '도장', '페인트 벗겨짐', '습기 문제 의심')`
     );
   }
 }
