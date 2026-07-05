@@ -14,23 +14,33 @@ async function countNonAdminHouseholds(client) {
 }
 
 async function restoreSampleCasesAndDefects(client) {
-  const seoul = await client.query(
-    `SELECT id FROM complex WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) LIMIT 1`,
-    ['서울 인싸이트자이']
-  );
-  if (seoul.rows.length === 0) return;
+  try {
+    const seoul = await client.query(
+      `SELECT id FROM complex WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) LIMIT 1`,
+      ['서울 인싸이트자이']
+    );
+    const seoulId = seoul.rows[0]?.id;
 
-  const seoulId = seoul.rows[0].id;
-  const hh1 = await client.query(
-    `SELECT h.id FROM household h
-     WHERE h.complex_id = $1 AND h.dong = '101' AND h.ho = '1203'`,
-    [seoulId]
-  );
-  const hh2 = await client.query(
-    `SELECT h.id FROM household h
-     WHERE h.complex_id = $1 AND h.dong = '102' AND h.ho = '1501'`,
-    [seoulId]
-  );
+    const hh1 = await client.query(
+      seoulId
+        ? `SELECT h.id FROM household h
+           WHERE h.complex_id = $1 AND h.dong = '101' AND h.ho = '1203'`
+        : `SELECT h.id FROM household h
+           JOIN complex c ON c.id = h.complex_id
+           WHERE LOWER(TRIM(c.name)) <> 'admin' AND h.dong = '101' AND h.ho = '1203'
+           LIMIT 1`,
+      seoulId ? [seoulId] : []
+    );
+    const hh2 = await client.query(
+      seoulId
+        ? `SELECT h.id FROM household h
+           WHERE h.complex_id = $1 AND h.dong = '102' AND h.ho = '1501'`
+        : `SELECT h.id FROM household h
+           JOIN complex c ON c.id = h.complex_id
+           WHERE LOWER(TRIM(c.name)) <> 'admin' AND h.dong = '102' AND h.ho = '1501'
+           LIMIT 1`,
+      seoulId ? [seoulId] : []
+    );
   const household1Id = hh1.rows[0]?.id;
   const household2Id = hh2.rows[0]?.id;
 
@@ -50,7 +60,10 @@ async function restoreSampleCasesAndDefects(client) {
       [household1Id]
     );
     const case1Id = case1.rows[0]?.id || 'CASE-24001';
-    await client.query(`DELETE FROM photo WHERE defect_id IN ('DEF-1', 'DEF-2')`);
+    await client.query(
+      `DELETE FROM defect_resolution WHERE defect_id IN ('DEF-1', 'DEF-2')`
+    ).catch(() => {});
+    await client.query(`DELETE FROM photo WHERE defect_id IN ('DEF-1', 'DEF-2')`).catch(() => {});
     await client.query(`DELETE FROM defect WHERE id IN ('DEF-1', 'DEF-2') OR case_id = $1`, [case1Id]);
     await client.query(
       `INSERT INTO defect (id, case_id, location, trade, content, memo) VALUES
@@ -58,6 +71,7 @@ async function restoreSampleCasesAndDefects(client) {
         ('DEF-2', $1, '주방', '타일', '타일 균열', '')`,
       [case1Id]
     );
+    console.log('[restore] household1', { household1Id, case1Id });
   }
   if (household2Id) {
     await client.query(
@@ -75,13 +89,18 @@ async function restoreSampleCasesAndDefects(client) {
       [household2Id]
     );
     const case2Id = case2.rows[0]?.id || 'CASE-24002';
-    await client.query(`DELETE FROM photo WHERE defect_id = 'DEF-3'`);
+    await client.query(`DELETE FROM defect_resolution WHERE defect_id = 'DEF-3'`).catch(() => {});
+    await client.query(`DELETE FROM photo WHERE defect_id = 'DEF-3'`).catch(() => {});
     await client.query(`DELETE FROM defect WHERE id = 'DEF-3' OR case_id = $1`, [case2Id]);
     await client.query(
       `INSERT INTO defect (id, case_id, location, trade, content, memo) VALUES
         ('DEF-3', $1, '욕실', '도장', '페인트 벗겨짐', '습기 문제 의심')`,
       [case2Id]
     );
+  }
+  } catch (error) {
+    console.error('[restore] sample cases/defects failed:', error.message);
+    throw error;
   }
 }
 
