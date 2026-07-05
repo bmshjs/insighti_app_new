@@ -13,6 +13,55 @@ async function countNonAdminHouseholds(client) {
   return result.rows[0].n;
 }
 
+async function restoreSampleCasesAndDefects(client) {
+  const seoul = await client.query(
+    `SELECT id FROM complex WHERE name = '서울 인싸이트자이' LIMIT 1`
+  );
+  if (seoul.rows.length === 0) return;
+
+  const seoulId = seoul.rows[0].id;
+  const hh1 = await client.query(
+    `SELECT h.id FROM household h
+     WHERE h.complex_id = $1 AND h.dong = '101' AND h.ho = '1203'`,
+    [seoulId]
+  );
+  const hh2 = await client.query(
+    `SELECT h.id FROM household h
+     WHERE h.complex_id = $1 AND h.dong = '102' AND h.ho = '1501'`,
+    [seoulId]
+  );
+  const household1Id = hh1.rows[0]?.id;
+  const household2Id = hh2.rows[0]?.id;
+
+  if (household1Id) {
+    await client.query(
+      `INSERT INTO case_header (id, household_id, type) VALUES
+        ('CASE-24001', $1, '하자접수')
+       ON CONFLICT (id) DO UPDATE SET household_id = EXCLUDED.household_id`,
+      [household1Id]
+    );
+    await client.query(
+      `INSERT INTO defect (id, case_id, location, trade, content, memo) VALUES
+        ('DEF-1', 'CASE-24001', '거실', '바닥재', '마루판 들뜸', '현장 확인 필요'),
+        ('DEF-2', 'CASE-24001', '주방', '타일', '타일 균열', '')
+       ON CONFLICT (id) DO NOTHING`
+    );
+  }
+  if (household2Id) {
+    await client.query(
+      `INSERT INTO case_header (id, household_id, type) VALUES
+        ('CASE-24002', $1, '하자접수')
+       ON CONFLICT (id) DO UPDATE SET household_id = EXCLUDED.household_id`,
+      [household2Id]
+    );
+    await client.query(
+      `INSERT INTO defect (id, case_id, location, trade, content, memo) VALUES
+        ('DEF-3', 'CASE-24002', '욕실', '도장', '페인트 벗겨짐', '습기 문제 의심')
+       ON CONFLICT (id) DO NOTHING`
+    );
+  }
+}
+
 async function restoreReferenceData(client) {
   console.log('[restore] reference data seeding...');
 
@@ -48,48 +97,7 @@ async function restoreReferenceData(client) {
     );
   }
 
-  if (seoulId) {
-    const hh1 = await client.query(
-      `SELECT h.id FROM household h
-       WHERE h.complex_id = $1 AND h.dong = '101' AND h.ho = '1203'`,
-      [seoulId]
-    );
-    const hh2 = await client.query(
-      `SELECT h.id FROM household h
-       WHERE h.complex_id = $1 AND h.dong = '102' AND h.ho = '1501'`,
-      [seoulId]
-    );
-    const household1Id = hh1.rows[0]?.id;
-    const household2Id = hh2.rows[0]?.id;
-
-    if (household1Id) {
-      await client.query(
-        `INSERT INTO case_header (id, household_id, type) VALUES
-          ('CASE-24001', $1, '하자접수')
-         ON CONFLICT (id) DO NOTHING`,
-        [household1Id]
-      );
-      await client.query(
-        `INSERT INTO defect (id, case_id, location, trade, content, memo) VALUES
-          ('DEF-1', 'CASE-24001', '거실', '바닥재', '마루판 들뜸', '현장 확인 필요'),
-          ('DEF-2', 'CASE-24001', '주방', '타일', '타일 균열', '')
-         ON CONFLICT (id) DO NOTHING`
-      );
-    }
-    if (household2Id) {
-      await client.query(
-        `INSERT INTO case_header (id, household_id, type) VALUES
-          ('CASE-24002', $1, '하자접수')
-         ON CONFLICT (id) DO NOTHING`,
-        [household2Id]
-      );
-      await client.query(
-        `INSERT INTO defect (id, case_id, location, trade, content, memo) VALUES
-          ('DEF-3', 'CASE-24002', '욕실', '도장', '페인트 벗겨짐', '습기 문제 의심')
-         ON CONFLICT (id) DO NOTHING`
-      );
-    }
-  }
+  await restoreSampleCasesAndDefects(client);
 
   await client.query(`
     INSERT INTO defect_videos (defect_category_id, youtube_video_id, youtube_url, title, description, timestamp_start, timestamp_end, is_primary)
@@ -161,10 +169,24 @@ async function restoreReferenceData(client) {
 
 async function restoreReferenceDataIfEmpty(client) {
   const nonAdmin = await countNonAdminHouseholds(client);
-  if (nonAdmin > 0) {
-    console.log(`[restore] skip (${nonAdmin} non-admin households already exist)`);
-    return { skipped: true, nonAdminHouseholds: nonAdmin };
+  const caseCount = await client.query('SELECT COUNT(*)::int AS n FROM case_header');
+
+  if (nonAdmin > 0 && caseCount.rows[0].n > 0) {
+    console.log(`[restore] skip (${nonAdmin} households, ${caseCount.rows[0].n} cases exist)`);
+    return { skipped: true, nonAdminHouseholds: nonAdmin, cases: caseCount.rows[0].n };
   }
+
+  if (nonAdmin > 0 && caseCount.rows[0].n === 0) {
+    console.log('[restore] households exist but no cases — restoring sample cases/defects');
+    await restoreSampleCasesAndDefects(client);
+    const summary = await client.query(`
+      SELECT
+        (SELECT COUNT(*)::int FROM case_header) AS cases,
+        (SELECT COUNT(*)::int FROM defect) AS defects
+    `);
+    return { skipped: false, partial: true, summary: summary.rows[0] };
+  }
+
   const summary = await restoreReferenceData(client);
   return { skipped: false, summary };
 }
@@ -172,4 +194,5 @@ async function restoreReferenceDataIfEmpty(client) {
 module.exports = {
   restoreReferenceData,
   restoreReferenceDataIfEmpty,
+  restoreSampleCasesAndDefects,
 };
