@@ -151,7 +151,7 @@ app.get('/', (req, res) => {
     status: 'OK', 
     message: 'InsightI API Server is running',
     timestamp: new Date().toISOString(),
-    version: '4.0.7'
+    version: '4.0.8'
   });
 });
 
@@ -160,7 +160,7 @@ app.get('/health', async (req, res) => {
   const payload = {
     status: 'OK',
     timestamp: new Date().toISOString(),
-    version: '4.0.7',
+    version: '4.0.8',
   };
 
   if (req.query.db === '1') {
@@ -168,6 +168,14 @@ app.get('/health', async (req, res) => {
       const pool = require('./database');
       await pool.query('SELECT 1 AS ok');
       payload.database = 'connected';
+      const counts = await pool.query(`
+        SELECT
+          (SELECT COUNT(*)::int FROM complex) AS complexes,
+          (SELECT COUNT(*)::int FROM household) AS households,
+          (SELECT COUNT(*)::int FROM case_header) AS cases,
+          (SELECT COUNT(*)::int FROM defect) AS defects
+      `);
+      payload.counts = counts.rows[0];
     } catch (error) {
       return res.status(503).json({
         ...payload,
@@ -185,7 +193,7 @@ app.get('/health', async (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     name: 'InsightI Pre/Post Inspection API',
-    version: '4.0.7', // Error handling improvements
+    version: '4.0.8', // Error handling improvements
     endpoints: {
       auth: '/api/auth',
       cases: '/api/cases',

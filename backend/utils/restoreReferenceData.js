@@ -37,7 +37,11 @@ async function restoreSampleCasesAndDefects(client) {
     await client.query(
       `INSERT INTO case_header (id, household_id, type) VALUES
         ('CASE-24001', $1, '하자접수')
-       ON CONFLICT (id) DO UPDATE SET household_id = EXCLUDED.household_id`,
+       ON CONFLICT (id) DO UPDATE SET household_id = EXCLUDED.household_id, type = EXCLUDED.type`,
+      [household1Id]
+    );
+    await client.query(
+      `UPDATE case_header SET household_id = $1 WHERE id = 'CASE-24001'`,
       [household1Id]
     );
     await client.query(
@@ -51,7 +55,11 @@ async function restoreSampleCasesAndDefects(client) {
     await client.query(
       `INSERT INTO case_header (id, household_id, type) VALUES
         ('CASE-24002', $1, '하자접수')
-       ON CONFLICT (id) DO UPDATE SET household_id = EXCLUDED.household_id`,
+       ON CONFLICT (id) DO UPDATE SET household_id = EXCLUDED.household_id, type = EXCLUDED.type`,
+      [household2Id]
+    );
+    await client.query(
+      `UPDATE case_header SET household_id = $1 WHERE id = 'CASE-24002'`,
       [household2Id]
     );
     await client.query(
