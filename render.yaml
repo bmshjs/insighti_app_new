@@ -7,7 +7,7 @@ databases:
 
 services:
   - type: web
-    name: mobile_app_new
+    name: insighti-app-new
     runtime: node
     region: singapore
     plan: free
@@ -20,6 +20,7 @@ services:
         value: production
       - key: PORT
         value: 10000
+      # Render PostgreSQL 호스트(dpg-xxx-a) 자동 보정에 사용
       - key: RENDER_REGION
         value: singapore
       - key: BACKEND_URL

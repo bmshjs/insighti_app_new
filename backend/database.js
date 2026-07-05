@@ -10,7 +10,13 @@ const connectionString = resolveDatabaseUrl();
 let pool;
 
 if (connectionString) {
-  console.log('📊 Using DATABASE_URL for connection');
+  try {
+    const dbHost = new URL(connectionString).hostname;
+    console.log('📊 Using DATABASE_URL for connection');
+    console.log(`📊 DB host: ${dbHost}`);
+  } catch (_) {
+    console.log('📊 Using DATABASE_URL for connection');
+  }
   pool = new Pool({
     connectionString,
     ssl: getPoolSslConfig(connectionString),

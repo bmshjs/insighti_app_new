@@ -151,7 +151,7 @@ app.get('/', (req, res) => {
     status: 'OK', 
     message: 'InsightI API Server is running',
     timestamp: new Date().toISOString(),
-    version: '4.0.2'
+    version: '4.0.4'
   });
 });
 
@@ -160,7 +160,7 @@ app.get('/health', async (req, res) => {
   const payload = {
     status: 'OK',
     timestamp: new Date().toISOString(),
-    version: '4.0.3',
+    version: '4.0.4',
   };
 
   if (req.query.db === '1') {
@@ -185,7 +185,7 @@ app.get('/health', async (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     name: 'InsightI Pre/Post Inspection API',
-    version: '4.0.2', // Error handling improvements
+    version: '4.0.4', // Error handling improvements
     endpoints: {
       auth: '/api/auth',
       cases: '/api/cases',
@@ -221,6 +221,16 @@ const PORT = config.port || process.env.PORT || 3000;
 console.log(`🔧 Starting server on port ${PORT}...`);
 console.log(`📊 NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
 console.log(`📊 DATABASE_URL: ${process.env.DATABASE_URL ? 'Set' : 'Not set'}`);
+console.log(`📊 RENDER_REGION: ${process.env.RENDER_REGION || 'singapore (default)'}`);
+try {
+  const { resolveDatabaseUrl } = require('./utils/databaseUrl');
+  const resolved = resolveDatabaseUrl();
+  if (resolved) {
+    console.log(`📊 Resolved DB host: ${new URL(resolved).hostname}`);
+  }
+} catch (e) {
+  console.warn('⚠️ DATABASE_URL resolve warning:', e.message);
+}
 
 // Start server with error handling
 const pool = require('./database');
