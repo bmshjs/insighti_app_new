@@ -19,6 +19,18 @@ function safeDecrypt(value, fallback) {
 
 const router = express.Router();
 
+async function householdHasEncryptedColumns() {
+  const result = await pool.query(
+    `SELECT 1
+     FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'household'
+       AND column_name = 'resident_name_encrypted'
+     LIMIT 1`
+  );
+  return result.rows.length > 0;
+}
+
 // Create session by household info
 router.post('/session', async (req, res) => {
   try {
@@ -48,13 +60,17 @@ router.post('/session', async (req, res) => {
       complexId = complexResult.rows[0].id;
     }
     
-    // Household 찾기 (단지+동+호만으로 조회) - 암호화된 필드도 조회
-    let householdResult = await pool.query(
-      `SELECT id, resident_name, phone, resident_name_encrypted, phone_encrypted, user_type 
-       FROM household 
-       WHERE complex_id = $1 AND dong = $2 AND ho = $3`,
-      [complexId, dong, ho]
-    );
+    // Household 찾기 (단지+동+호만으로 조회)
+    const hasEncrypted = await householdHasEncryptedColumns();
+    const householdSelect = hasEncrypted
+      ? `SELECT id, resident_name, phone, resident_name_encrypted, phone_encrypted, user_type
+         FROM household
+         WHERE complex_id = $1 AND dong = $2 AND ho = $3`
+      : `SELECT id, resident_name, phone, user_type
+         FROM household
+         WHERE complex_id = $1 AND dong = $2 AND ho = $3`;
+
+    let householdResult = await pool.query(householdSelect, [complexId, dong, ho]);
     
     let householdId;
     let userName = name || '';
@@ -73,12 +89,18 @@ router.post('/session', async (req, res) => {
       const nameEncrypted = encrypt(name);
       const phoneEncrypted = encrypt(phone);
 
-      const newHouseholdResult = await pool.query(
-        `INSERT INTO household (complex_id, dong, ho, resident_name, phone, resident_name_encrypted, phone_encrypted)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING id`,
-        [complexId, dong, ho, name, phone, nameEncrypted, phoneEncrypted]
-      );
+      const insertSql = hasEncrypted
+        ? `INSERT INTO household (complex_id, dong, ho, resident_name, phone, resident_name_encrypted, phone_encrypted)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING id`
+        : `INSERT INTO household (complex_id, dong, ho, resident_name, phone)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING id`;
+      const insertParams = hasEncrypted
+        ? [complexId, dong, ho, name, phone, nameEncrypted, phoneEncrypted]
+        : [complexId, dong, ho, name, phone];
+
+      const newHouseholdResult = await pool.query(insertSql, insertParams);
 
       householdId = newHouseholdResult.rows[0].id;
       userName = name;
@@ -103,15 +125,22 @@ router.post('/session', async (req, res) => {
 
       if (finalName !== existingName || finalPhone !== existingPhone) {
         safeLog('info', '세대 정보 업데이트', { name: finalName, phone: finalPhone });
-        const nameEncrypted = encrypt(finalName);
-        const phoneEncrypted = encrypt(finalPhone);
-        await pool.query(
-          `UPDATE household 
-           SET resident_name = $1, phone = $2, 
-               resident_name_encrypted = $4, phone_encrypted = $5 
-           WHERE id = $3`,
-          [finalName, finalPhone, householdId, nameEncrypted, phoneEncrypted]
-        );
+        if (hasEncrypted) {
+          const nameEncrypted = encrypt(finalName);
+          const phoneEncrypted = encrypt(finalPhone);
+          await pool.query(
+            `UPDATE household
+             SET resident_name = $1, phone = $2,
+                 resident_name_encrypted = $4, phone_encrypted = $5
+             WHERE id = $3`,
+            [finalName, finalPhone, householdId, nameEncrypted, phoneEncrypted]
+          );
+        } else {
+          await pool.query(
+            `UPDATE household SET resident_name = $1, phone = $2 WHERE id = $3`,
+            [finalName, finalPhone, householdId]
+          );
+        }
       }
 
       safeLog('info', '기존 세대 로그인', { householdId });

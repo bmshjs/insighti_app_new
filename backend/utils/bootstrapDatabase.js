@@ -37,13 +37,26 @@ async function runSqlFile(client, relativePath) {
         msg.includes('already exists') ||
         msg.includes('duplicate key') ||
         msg.includes('duplicate_object') ||
-        msg.includes('does not exist') && msg.includes('constraint')
+        (msg.includes('does not exist') && msg.includes('constraint')) ||
+        (msg.includes('does not exist') && msg.includes('relation'))
       ) {
         continue;
       }
       throw error;
     }
   }
+}
+
+async function ensureHouseholdColumns(client) {
+  await client.query(
+    `ALTER TABLE household ADD COLUMN IF NOT EXISTS user_type TEXT DEFAULT 'resident'`
+  );
+  await client.query(
+    `ALTER TABLE household ADD COLUMN IF NOT EXISTS resident_name_encrypted TEXT`
+  );
+  await client.query(
+    `ALTER TABLE household ADD COLUMN IF NOT EXISTS phone_encrypted TEXT`
+  );
 }
 
 async function bootstrapDatabase(pool) {
@@ -66,6 +79,9 @@ async function bootstrapDatabase(pool) {
   let client;
   try {
     client = await pool.connect();
+
+    console.log('[bootstrap] ensuring household columns...');
+    await ensureHouseholdColumns(client);
 
     const hasComplex = await tableExists(client, 'complex');
     if (!hasComplex) {
