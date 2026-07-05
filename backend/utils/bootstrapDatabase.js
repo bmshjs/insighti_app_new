@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { restoreReferenceDataIfEmpty, restoreSampleCasesAndDefects, restoreReferenceData } = require('./restoreReferenceData');
+const { restoreReferenceDataIfEmpty, restoreSampleCasesAndDefects, restoreReferenceData, countNonAdminHouseholds } = require('./restoreReferenceData');
 /**
  * DB 연결 후 스키마·점검원 계정·하자 카테고리를 idempotent 하게 준비합니다.
  */
@@ -97,8 +97,12 @@ async function bootstrapDatabase(pool) {
     if (defectCount.rows[0].n === 0) {
       console.log('[bootstrap] no defects found — restoring reference data');
       try {
-        await restoreReferenceData(client);
-        await restoreSampleCasesAndDefects(client);
+        const nonAdmin = await countNonAdminHouseholds(client);
+        if (nonAdmin === 0) {
+          await restoreReferenceData(client);
+        } else {
+          await restoreSampleCasesAndDefects(client);
+        }
       } catch (error) {
         console.error('[bootstrap] reference restore failed:', error.message);
       }

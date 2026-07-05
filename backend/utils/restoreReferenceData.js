@@ -100,7 +100,6 @@ async function restoreSampleCasesAndDefects(client) {
   }
   } catch (error) {
     console.error('[restore] sample cases/defects failed:', error.message);
-    throw error;
   }
 }
 
@@ -243,4 +242,5 @@ module.exports = {
   restoreReferenceData,
   restoreReferenceDataIfEmpty,
   restoreSampleCasesAndDefects,
+  countNonAdminHouseholds,
 };
