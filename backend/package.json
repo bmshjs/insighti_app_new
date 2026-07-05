@@ -20,6 +20,7 @@
     "trim-households": "node scripts/trim-households-to-five.js",
     "create-inspector": "node scripts/create-inspector-household.js",
     "bootstrap-db": "node scripts/bootstrap-db-cli.js",
+    "restore-reference-data": "node scripts/restore-reference-data.js",
     "seed-inspections-final-report": "node scripts/seed-inspections-and-final-report.js",
     "ensure-fonts": "node scripts/ensure-korean-font.js",
     "docker:build": "docker build -t insighti-backend .",

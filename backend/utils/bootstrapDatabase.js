@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-
+const { restoreReferenceDataIfEmpty } = require('./restoreReferenceData');
 /**
  * DB 연결 후 스키마·점검원 계정·하자 카테고리를 idempotent 하게 준비합니다.
  */
@@ -92,6 +92,8 @@ async function bootstrapDatabase(pool) {
       console.log(`[bootstrap] running ${file}`);
       await runSqlFile(client, file);
     }
+
+    await restoreReferenceDataIfEmpty(client);
 
     return { ok: true };
   } catch (error) {
