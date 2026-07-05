@@ -15,7 +15,8 @@ async function countNonAdminHouseholds(client) {
 
 async function restoreSampleCasesAndDefects(client) {
   const seoul = await client.query(
-    `SELECT id FROM complex WHERE name = '서울 인싸이트자이' LIMIT 1`
+    `SELECT id FROM complex WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) LIMIT 1`,
+    ['서울 인싸이트자이']
   );
   if (seoul.rows.length === 0) return;
 
@@ -95,9 +96,15 @@ async function restoreReferenceData(client) {
   `);
 
   const complexes = await client.query(
-    `SELECT id, name FROM complex WHERE name IN ('서울 인싸이트자이', '부산 해운대 뷰')`
+    `SELECT id, name FROM complex
+     WHERE LOWER(TRIM(name)) IN (LOWER(TRIM($1)), LOWER(TRIM($2)))`,
+    ['서울 인싸이트자이', '부산 해운대 뷰']
   );
-  const byName = Object.fromEntries(complexes.rows.map((r) => [r.name, r.id]));
+  const byName = {};
+  for (const row of complexes.rows) {
+    const key = row.name && row.name.includes('인싸이트') ? '서울 인싸이트자이' : '부산 해운대 뷰';
+    byName[key] = row.id;
+  }
   const seoulId = byName['서울 인싸이트자이'];
   const busanId = byName['부산 해운대 뷰'];
 
