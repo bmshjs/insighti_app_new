@@ -94,7 +94,11 @@ async function bootstrapDatabase(pool) {
     }
 
     await restoreReferenceDataIfEmpty(client);
-    await restoreSampleCasesAndDefects(client);
+    try {
+      await restoreSampleCasesAndDefects(client);
+    } catch (error) {
+      console.error('[bootstrap] restoreSampleCasesAndDefects failed:', error.message);
+    }
 
     return { ok: true };
   } catch (error) {

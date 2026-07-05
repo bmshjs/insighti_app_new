@@ -151,7 +151,7 @@ app.get('/', (req, res) => {
     status: 'OK', 
     message: 'InsightI API Server is running',
     timestamp: new Date().toISOString(),
-    version: '4.1.2'
+    version: '4.1.3'
   });
 });
 
@@ -160,7 +160,7 @@ app.get('/health', async (req, res) => {
   const payload = {
     status: 'OK',
     timestamp: new Date().toISOString(),
-    version: '4.1.2',
+    version: '4.1.3',
   };
 
   if (req.query.db === '1') {
@@ -189,11 +189,38 @@ app.get('/health', async (req, res) => {
   res.json(payload);
 });
 
+// 레퍼런스 데이터 수동 복구 (헤더 x-restore-key = JWT_SECRET)
+app.post('/health/restore-reference', async (req, res) => {
+  const key = req.headers['x-restore-key'];
+  if (!key || key !== config.jwt.secret) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  const pool = require('./database');
+  const { restoreReferenceData, restoreSampleCasesAndDefects } = require('./utils/restoreReferenceData');
+  const client = await pool.connect();
+  try {
+    const summary = await restoreReferenceData(client);
+    await restoreSampleCasesAndDefects(client);
+    const counts = await client.query(`
+      SELECT
+        (SELECT COUNT(*)::int FROM complex) AS complexes,
+        (SELECT COUNT(*)::int FROM household) AS households,
+        (SELECT COUNT(*)::int FROM case_header) AS cases,
+        (SELECT COUNT(*)::int FROM defect) AS defects
+    `);
+    res.json({ ok: true, summary, counts: counts.rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
 // API documentation endpoint
 app.get('/api', (req, res) => {
   res.json({
     name: 'InsightI Pre/Post Inspection API',
-    version: '4.1.2', // Error handling improvements
+    version: '4.1.3', // Error handling improvements
     endpoints: {
       auth: '/api/auth',
       cases: '/api/cases',
