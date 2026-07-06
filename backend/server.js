@@ -146,12 +146,14 @@ app.use('/api/sms', smsRoutes);
 app.use('/api/admin', adminRoutes); // NEW: Admin functions
 
 // Root endpoint (for Render health checks)
+const APP_VERSION = '4.1.6';
+
 app.get('/', (req, res) => {
   res.json({ 
     status: 'OK', 
     message: 'InsightI API Server is running',
     timestamp: new Date().toISOString(),
-    version: '4.1.5'
+    version: APP_VERSION
   });
 });
 
@@ -160,7 +162,7 @@ app.get('/health', async (req, res) => {
   const payload = {
     status: 'OK',
     timestamp: new Date().toISOString(),
-    version: '4.1.5',
+    version: APP_VERSION,
   };
 
   if (req.query.db === '1') {
@@ -187,6 +189,54 @@ app.get('/health', async (req, res) => {
   }
 
   res.json(payload);
+});
+
+// 점검 스키마 수동 보강 (헤더 x-restore-key = JWT_SECRET)
+app.post('/health/bootstrap-schema', async (req, res) => {
+  const key = req.headers['x-restore-key'];
+  if (!key || key !== config.jwt.secret) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  const pool = require('./database');
+  const sqlPath = path.join(__dirname, 'scripts', 'ensure-inspection-schema.sql');
+  const sql = fs.readFileSync(sqlPath, 'utf8');
+  const statements = sql
+    .split(/;\s*\r?\n/)
+    .map((stmt) => stmt.replace(/--[^\n]*/g, '').trim())
+    .filter((stmt) => stmt.length > 0);
+  const client = await pool.connect();
+  const applied = [];
+  const skipped = [];
+  try {
+    for (const statement of statements) {
+      try {
+        await client.query(statement);
+        applied.push(statement.slice(0, 60).replace(/\s+/g, ' '));
+      } catch (error) {
+        const msg = error.message || '';
+        if (
+          msg.includes('already exists') ||
+          msg.includes('duplicate key') ||
+          (msg.includes('does not exist') && msg.includes('constraint'))
+        ) {
+          skipped.push(msg.slice(0, 100));
+        } else {
+          throw error;
+        }
+      }
+    }
+    const check = await client.query("SELECT to_regclass('public.inspection_item') AS table_name");
+    res.json({
+      ok: true,
+      inspection_item: check.rows[0].table_name || null,
+      applied: applied.length,
+      skipped: skipped.length,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
 });
 
 // 레퍼런스 데이터 수동 복구 (헤더 x-restore-key = JWT_SECRET)
@@ -220,7 +270,7 @@ app.post('/health/restore-reference', async (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     name: 'InsightI Pre/Post Inspection API',
-    version: '4.1.5', // Error handling improvements
+    version: APP_VERSION, // Error handling improvements
     endpoints: {
       auth: '/api/auth',
       cases: '/api/cases',
