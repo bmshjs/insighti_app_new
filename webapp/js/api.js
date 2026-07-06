@@ -77,7 +77,8 @@ class APIClient {
             const msg = serverMessage || (resp.status === 401 ? '토큰이 만료되었습니다. 다시 로그인해주세요.' : '권한이 없습니다.');
             console.warn('⚠️', msg);
             this.clearToken();
-            if (window.route) {
+            const isInspectorPage = /inspector\.html$/i.test(window.location.pathname || '');
+            if (window.route && !isInspectorPage) {
               window.route('login');
             }
             const err = new Error(msg);

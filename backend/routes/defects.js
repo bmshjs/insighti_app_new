@@ -72,67 +72,70 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
+function buildUsersWithDefectsQuery({ useEncrypted, useInspection }) {
+  const encryptedSelect = useEncrypted ? 'h.resident_name_encrypted,' : '';
+  const encryptedGroup = useEncrypted ? ', h.resident_name_encrypted' : '';
+  const inspectionJoin = useInspection
+    ? 'LEFT JOIN inspection_item ii ON ii.defect_id = d.id'
+    : '';
+  const inspectedCount = useInspection
+    ? 'COUNT(ii.id) AS inspected_count'
+    : '0::bigint AS inspected_count';
+
+  return `
+      WITH household_defects AS (
+        SELECT 
+          h.id AS household_id,
+          c.name AS complex_name,
+          h.dong,
+          h.ho,
+          h.resident_name,
+          ${encryptedSelect}
+          COUNT(d.id) AS defect_count,
+          ${inspectedCount}
+        FROM household h
+        JOIN complex c ON h.complex_id = c.id
+        JOIN case_header ch ON ch.household_id = h.id
+        JOIN defect d ON d.case_id = ch.id
+        ${inspectionJoin}
+        WHERE LOWER(TRIM(c.name)) <> 'admin'
+        GROUP BY h.id, c.name, h.dong, h.ho, h.resident_name${encryptedGroup}
+      )
+      SELECT * FROM household_defects
+      ORDER BY (inspected_count > 0) DESC, defect_count DESC, dong, ho
+      LIMIT 500
+    `;
+}
+
 // 점검원용: 하자가 등록된 사용자(세대) 목록 (household_id 기준)
 // 점검결과( inspection_item )가 하나라도 있는 사용자는 상단 정렬 + has_inspected 표시
-// resident_name_encrypted 컬럼 없어도 동작 (기본 스키마만 있어도 OK)
+// resident_name_encrypted·inspection_item 없어도 동작 (기본 스키마만 있어도 OK)
 router.get('/users', authenticateToken, requireInspectorAccess, async (req, res) => {
   try {
-    const queryWithEncrypted = `
-      WITH household_defects AS (
-        SELECT 
-          h.id AS household_id,
-          c.name AS complex_name,
-          h.dong,
-          h.ho,
-          h.resident_name,
-          h.resident_name_encrypted,
-          COUNT(d.id) AS defect_count,
-          COUNT(ii.id) AS inspected_count
-        FROM household h
-        JOIN complex c ON h.complex_id = c.id
-        JOIN case_header ch ON ch.household_id = h.id
-        JOIN defect d ON d.case_id = ch.id
-        LEFT JOIN inspection_item ii ON ii.defect_id = d.id
-        WHERE LOWER(TRIM(c.name)) <> 'admin'
-        GROUP BY h.id, c.name, h.dong, h.ho, h.resident_name, h.resident_name_encrypted
-      )
-      SELECT * FROM household_defects
-      ORDER BY (inspected_count > 0) DESC, defect_count DESC, dong, ho
-      LIMIT 500
-    `;
-    const queryBasic = `
-      WITH household_defects AS (
-        SELECT 
-          h.id AS household_id,
-          c.name AS complex_name,
-          h.dong,
-          h.ho,
-          h.resident_name,
-          COUNT(d.id) AS defect_count,
-          COUNT(ii.id) AS inspected_count
-        FROM household h
-        JOIN complex c ON h.complex_id = c.id
-        JOIN case_header ch ON ch.household_id = h.id
-        JOIN defect d ON d.case_id = ch.id
-        LEFT JOIN inspection_item ii ON ii.defect_id = d.id
-        WHERE LOWER(TRIM(c.name)) <> 'admin'
-        GROUP BY h.id, c.name, h.dong, h.ho, h.resident_name
-      )
-      SELECT * FROM household_defects
-      ORDER BY (inspected_count > 0) DESC, defect_count DESC, dong, ho
-      LIMIT 500
-    `;
+    const queryAttempts = [
+      { useEncrypted: true, useInspection: true },
+      { useEncrypted: false, useInspection: true },
+      { useEncrypted: true, useInspection: false },
+      { useEncrypted: false, useInspection: false },
+    ];
+
     let result;
-    try {
-      result = await pool.query(queryWithEncrypted);
-    } catch (firstErr) {
-      console.warn('Get users with defects (encrypted query) failed, trying basic:', firstErr.message);
+    let lastErr;
+    for (const opts of queryAttempts) {
       try {
-        result = await pool.query(queryBasic);
-      } catch (secondErr) {
-        console.error('Get users with defects (basic query) failed:', secondErr);
-        throw secondErr;
+        result = await pool.query(buildUsersWithDefectsQuery(opts));
+        break;
+      } catch (err) {
+        lastErr = err;
+        console.warn(
+          `Get users with defects failed (encrypted=${opts.useEncrypted}, inspection=${opts.useInspection}), trying fallback:`,
+          err.message
+        );
       }
+    }
+    if (!result) {
+      console.error('Get users with defects: all query attempts failed:', lastErr);
+      throw lastErr;
     }
     const users = (result.rows || []).map((row) => {
       const inspectedCount = parseInt(row.inspected_count, 10) || 0;
