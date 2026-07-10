@@ -59,3 +59,28 @@ CREATE INDEX IF NOT EXISTS idx_air_measure_item ON air_measure(item_id);
 CREATE INDEX IF NOT EXISTS idx_radon_measure_item ON radon_measure(item_id);
 CREATE INDEX IF NOT EXISTS idx_level_measure_item ON level_measure(item_id);
 CREATE INDEX IF NOT EXISTS idx_thermal_photo_item ON thermal_photo(item_id);
+
+CREATE TABLE IF NOT EXISTS inspection_photo (
+  id TEXT PRIMARY KEY,
+  item_id TEXT NOT NULL REFERENCES inspection_item(id) ON DELETE CASCADE,
+  file_url TEXT NOT NULL,
+  caption TEXT,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_inspection_photo_item ON inspection_photo(item_id);
+
+ALTER TABLE inspection_item ADD COLUMN IF NOT EXISTS serial_no TEXT;
+
+ALTER TABLE air_measure ADD COLUMN IF NOT EXISTS process_type TEXT;
+
+ALTER TABLE level_measure ADD COLUMN IF NOT EXISTS point1_left_mm DECIMAL(5,1);
+ALTER TABLE level_measure ADD COLUMN IF NOT EXISTS point1_right_mm DECIMAL(5,1);
+ALTER TABLE level_measure ADD COLUMN IF NOT EXISTS point2_left_mm DECIMAL(5,1);
+ALTER TABLE level_measure ADD COLUMN IF NOT EXISTS point2_right_mm DECIMAL(5,1);
+ALTER TABLE level_measure ADD COLUMN IF NOT EXISTS point3_left_mm DECIMAL(5,1);
+ALTER TABLE level_measure ADD COLUMN IF NOT EXISTS point3_right_mm DECIMAL(5,1);
+ALTER TABLE level_measure ADD COLUMN IF NOT EXISTS point4_left_mm DECIMAL(5,1);
+ALTER TABLE level_measure ADD COLUMN IF NOT EXISTS point4_right_mm DECIMAL(5,1);
+ALTER TABLE level_measure ADD COLUMN IF NOT EXISTS reference_mm DECIMAL(5,1) DEFAULT 150;

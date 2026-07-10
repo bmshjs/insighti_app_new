@@ -2,6 +2,7 @@
 const express = require('express');
 const pool = require('../database');
 const { authenticateToken, requireEquipmentAccess, requireInspectorAccess } = require('../middleware/auth');
+const { queryInspectionRows, groupInspectionRows } = require('../utils/inspectionQuery');
 const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
@@ -490,63 +491,12 @@ router.get('/by-household/:householdId', authenticateToken, async (req, res) => 
       return res.status(400).json({ error: '유효한 세대 ID가 필요합니다' });
     }
 
-    const query = `
-      SELECT 
-        ii.*,
-        am.process_type, am.tvoc, am.hcho, am.co2, am.unit_tvoc, am.unit_hcho,
-        rm.radon, rm.unit_radon,
-        lm.left_mm, lm.right_mm,
-        lm.point1_left_mm, lm.point1_right_mm, lm.point2_left_mm, lm.point2_right_mm,
-        lm.point3_left_mm, lm.point3_right_mm, lm.point4_left_mm, lm.point4_right_mm,
-        lm.reference_mm,
-        (SELECT json_agg(json_build_object('file_url', tp.file_url, 'caption', tp.caption, 'shot_at', tp.shot_at))
-         FROM thermal_photo tp WHERE tp.item_id = ii.id) as thermal_photos,
-        (SELECT json_agg(json_build_object('id', ip.id, 'file_url', ip.file_url, 'caption', ip.caption, 'sort_order', ip.sort_order) ORDER BY ip.sort_order)
-         FROM inspection_photo ip WHERE ip.item_id = ii.id) as inspection_photos
-      FROM inspection_item ii
-      LEFT JOIN air_measure am ON ii.id = am.item_id
-      LEFT JOIN radon_measure rm ON ii.id = rm.item_id
-      LEFT JOIN level_measure lm ON ii.id = lm.item_id
-      WHERE ii.case_id IN (SELECT id FROM case_header WHERE household_id = $1)
-      ORDER BY ii.created_at ASC
-    `;
-    const result = await pool.query(query, [hid]);
-
-    const normalizeLevelItem = (i) => {
-      if (i.type !== 'level') return i;
-      return {
-        ...i,
-        reference_mm: i.reference_mm ?? i.level_reference_mm ?? 150,
-        point1_left_mm: i.point1_left_mm ?? i.left_mm,
-        point1_right_mm: i.point1_right_mm ?? i.right_mm,
-        point2_left_mm: i.point2_left_mm,
-        point2_right_mm: i.point2_right_mm,
-        point3_left_mm: i.point3_left_mm,
-        point3_right_mm: i.point3_right_mm,
-        point4_left_mm: i.point4_left_mm,
-        point4_right_mm: i.point4_right_mm,
-        left_mm: i.left_mm,
-        right_mm: i.right_mm
-      };
-    };
-    const toPhotoArr = (v) => {
-      if (!v) return [];
-      if (Array.isArray(v)) return v;
-      return [v];
-    };
-    const grouped = { visual: [], thermal: [], air: [], radon: [], level: [] };
-    (result.rows || []).forEach((row) => {
-      const type = row.type || 'thermal';
-      if (!grouped[type]) grouped[type] = [];
-      const item = normalizeLevelItem({ ...row });
-      const inspectionPhotos = toPhotoArr(row.inspection_photos);
-      const thermalPhotos = toPhotoArr(row.thermal_photos);
-      const merged = [...inspectionPhotos, ...thermalPhotos];
-      item.photos = merged.filter((p) => p && (p.file_url || p.url || p.thumb_url));
-      delete item.thermal_photos;
-      delete item.inspection_photos;
-      grouped[type].push(item);
+    const result = await queryInspectionRows(pool, {
+      whereClause: 'ii.case_id IN (SELECT id FROM case_header WHERE household_id = $1)',
+      params: [hid],
+      orderBy: 'ii.created_at ASC',
     });
+    const grouped = groupInspectionRows(result.rows, { fixedTypes: true });
 
     res.json({
       success: true,
@@ -556,7 +506,7 @@ router.get('/by-household/:householdId', authenticateToken, async (req, res) => 
     });
   } catch (error) {
     console.error('세대별 점검 항목 조회 오류:', error);
-    res.status(500).json({ error: '서버 오류가 발생했습니다' });
+    res.status(500).json({ error: '서버 오류가 발생했습니다', message: error.message });
   }
 });
 
@@ -625,67 +575,13 @@ router.get('/:caseId', authenticateToken, async (req, res) => {
   try {
     const { caseId } = req.params;
     
-    const query = `
-      SELECT 
-        ii.*,
-        am.process_type, am.tvoc, am.hcho, am.co2, am.unit_tvoc, am.unit_hcho,
-        rm.radon, rm.unit_radon,
-        lm.left_mm, lm.right_mm,
-        lm.point1_left_mm, lm.point1_right_mm, lm.point2_left_mm, lm.point2_right_mm,
-        lm.point3_left_mm, lm.point3_right_mm, lm.point4_left_mm, lm.point4_right_mm,
-        lm.reference_mm,
-        (SELECT json_agg(json_build_object('file_url', tp.file_url, 'caption', tp.caption, 'shot_at', tp.shot_at))
-         FROM thermal_photo tp WHERE tp.item_id = ii.id) as thermal_photos,
-        (SELECT json_agg(json_build_object('id', ip.id, 'file_url', ip.file_url, 'caption', ip.caption, 'sort_order', ip.sort_order) ORDER BY ip.sort_order)
-         FROM inspection_photo ip WHERE ip.item_id = ii.id) as inspection_photos
-      FROM inspection_item ii
-      LEFT JOIN air_measure am ON ii.id = am.item_id
-      LEFT JOIN radon_measure rm ON ii.id = rm.item_id
-      LEFT JOIN level_measure lm ON ii.id = lm.item_id
-      WHERE ii.case_id = $1
-      ORDER BY ii.created_at DESC
-    `;
-    
-    const result = await pool.query(query, [caseId]);
-    const normalizeLevelItem = (i) => {
-      if (i.type !== 'level') return i;
-      return {
-        ...i,
-        reference_mm: i.reference_mm ?? i.level_reference_mm ?? 150,
-        point1_left_mm: i.point1_left_mm ?? i.left_mm,
-        point1_right_mm: i.point1_right_mm ?? i.right_mm,
-        point2_left_mm: i.point2_left_mm,
-        point2_right_mm: i.point2_right_mm,
-        point3_left_mm: i.point3_left_mm,
-        point3_right_mm: i.point3_right_mm,
-        point4_left_mm: i.point4_left_mm,
-        point4_right_mm: i.point4_right_mm,
-        left_mm: i.left_mm,
-        right_mm: i.right_mm
-      };
-    };
-    const withPhotos = (result.rows || []).map((row) => {
-      const item = normalizeLevelItem({ ...row });
-      const inspectionPhotos = (row.inspection_photos && Array.isArray(row.inspection_photos))
-        ? row.inspection_photos
-        : (row.inspection_photos ? [row.inspection_photos] : []);
-      const thermalPhotos = (row.thermal_photos && Array.isArray(row.thermal_photos))
-        ? row.thermal_photos
-        : (row.thermal_photos ? [row.thermal_photos] : []);
-      item.photos = [...inspectionPhotos, ...thermalPhotos];
-      delete item.thermal_photos;
-      delete item.inspection_photos;
-      return item;
+    const result = await queryInspectionRows(pool, {
+      whereClause: 'ii.case_id = $1',
+      params: [caseId],
+      orderBy: 'ii.created_at DESC',
     });
-    
-    const grouped = withPhotos.reduce((acc, row) => {
-      if (!acc[row.type]) {
-        acc[row.type] = [];
-      }
-      acc[row.type].push(row);
-      return acc;
-    }, {});
-    
+    const grouped = groupInspectionRows(result.rows);
+
     res.json({
       success: true,
       caseId: caseId,
@@ -695,7 +591,7 @@ router.get('/:caseId', authenticateToken, async (req, res) => {
     
   } catch (error) {
     console.error('점검 항목 조회 오류:', error);
-    res.status(500).json({ error: '서버 오류가 발생했습니다' });
+    res.status(500).json({ error: '서버 오류가 발생했습니다', message: error.message });
   }
 });
 
@@ -704,68 +600,13 @@ router.get('/defects/:defectId', authenticateToken, async (req, res) => {
   try {
     const { defectId } = req.params;
     
-    const query = `
-      SELECT 
-        ii.*,
-        am.process_type, am.tvoc, am.hcho, am.co2, am.unit_tvoc, am.unit_hcho,
-        rm.radon, rm.unit_radon,
-        lm.left_mm, lm.right_mm,
-        lm.point1_left_mm, lm.point1_right_mm, lm.point2_left_mm, lm.point2_right_mm,
-        lm.point3_left_mm, lm.point3_right_mm, lm.point4_left_mm, lm.point4_right_mm,
-        lm.reference_mm,
-        (SELECT json_agg(json_build_object('file_url', tp.file_url, 'caption', tp.caption, 'shot_at', tp.shot_at))
-         FROM thermal_photo tp WHERE tp.item_id = ii.id) as thermal_photos,
-        (SELECT json_agg(json_build_object('id', ip.id, 'file_url', ip.file_url, 'caption', ip.caption, 'sort_order', ip.sort_order) ORDER BY ip.sort_order)
-         FROM inspection_photo ip WHERE ip.item_id = ii.id) as inspection_photos
-      FROM inspection_item ii
-      LEFT JOIN air_measure am ON ii.id = am.item_id
-      LEFT JOIN radon_measure rm ON ii.id = rm.item_id
-      LEFT JOIN level_measure lm ON ii.id = lm.item_id
-      WHERE ii.defect_id = $1
-      ORDER BY ii.created_at DESC
-    `;
-    
-    const result = await pool.query(query, [defectId]);
-    
-    const normalizeLevelItem = (i) => {
-      if (i.type !== 'level') return i;
-      return {
-        ...i,
-        reference_mm: i.reference_mm ?? i.level_reference_mm ?? 150,
-        point1_left_mm: i.point1_left_mm ?? i.left_mm,
-        point1_right_mm: i.point1_right_mm ?? i.right_mm,
-        point2_left_mm: i.point2_left_mm,
-        point2_right_mm: i.point2_right_mm,
-        point3_left_mm: i.point3_left_mm,
-        point3_right_mm: i.point3_right_mm,
-        point4_left_mm: i.point4_left_mm,
-        point4_right_mm: i.point4_right_mm,
-        left_mm: i.left_mm,
-        right_mm: i.right_mm
-      };
-    };
-    const withPhotos = (result.rows || []).map((row) => {
-      const item = normalizeLevelItem({ ...row });
-      const inspectionPhotos = (row.inspection_photos && Array.isArray(row.inspection_photos))
-        ? row.inspection_photos
-        : (row.inspection_photos ? [row.inspection_photos] : []);
-      const thermalPhotos = (row.thermal_photos && Array.isArray(row.thermal_photos))
-        ? row.thermal_photos
-        : (row.thermal_photos ? [row.thermal_photos] : []);
-      item.photos = [...inspectionPhotos, ...thermalPhotos];
-      delete item.thermal_photos;
-      delete item.inspection_photos;
-      return item;
+    const result = await queryInspectionRows(pool, {
+      whereClause: 'ii.defect_id = $1',
+      params: [defectId],
+      orderBy: 'ii.created_at DESC',
     });
-    
-    const grouped = withPhotos.reduce((acc, row) => {
-      if (!acc[row.type]) {
-        acc[row.type] = [];
-      }
-      acc[row.type].push(row);
-      return acc;
-    }, {});
-    
+    const grouped = groupInspectionRows(result.rows);
+
     res.json({
       success: true,
       defectId: defectId,
@@ -775,7 +616,7 @@ router.get('/defects/:defectId', authenticateToken, async (req, res) => {
     
   } catch (error) {
     console.error('하자별 점검 항목 조회 오류:', error);
-    res.status(500).json({ error: '서버 오류가 발생했습니다' });
+    res.status(500).json({ error: '서버 오류가 발생했습니다', message: error.message });
   }
 });
 
