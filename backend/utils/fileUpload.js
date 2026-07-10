@@ -36,19 +36,28 @@ class FileUploadService {
     return `${baseName}-${uuid}${ext}`;
   }
 
-  async processImage(filePath, options = {}) {
+  createSharpInput(input) {
+    if (Buffer.isBuffer(input)) {
+      return sharp(input, { failOn: 'none' });
+    }
+    if (typeof input === 'string') {
+      return sharp(input);
+    }
+    throw new Error('Invalid image input');
+  }
+
+  async processImage(input, options = {}) {
     const {
       width = 1200,
       height = 1200,
       quality = 80,
-      format = 'jpeg'
     } = options;
 
     try {
-      const processedBuffer = await sharp(filePath)
-        .resize(width, height, { 
+      const processedBuffer = await this.createSharpInput(input)
+        .resize(width, height, {
           fit: 'inside',
-          withoutEnlargement: true 
+          withoutEnlargement: true,
         })
         .jpeg({ quality })
         .toBuffer();
@@ -60,12 +69,12 @@ class FileUploadService {
     }
   }
 
-  async generateThumbnail(filePath, size = 200) {
+  async generateThumbnail(input, size = 200) {
     try {
-      const thumbnailBuffer = await sharp(filePath)
-        .resize(size, size, { 
+      const thumbnailBuffer = await this.createSharpInput(input)
+        .resize(size, size, {
           fit: 'cover',
-          position: 'center'
+          position: 'center',
         })
         .jpeg({ quality: 70 })
         .toBuffer();

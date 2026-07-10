@@ -26,9 +26,14 @@ router.get('/serve/:filename', (req, res) => {
       return res.status(400).json({ error: 'Invalid filename' });
     }
     const uploadDir = getUploadDir();
-    const filePath = path.join(uploadDir, filename);
+    let filePath = path.join(uploadDir, filename);
     if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'File not found' });
+      const thumbPath = path.join(uploadDir, 'thumbs', `thumb-${filename}`);
+      if (fs.existsSync(thumbPath)) {
+        filePath = thumbPath;
+      } else {
+        return res.status(404).json({ error: 'File not found' });
+      }
     }
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('Cache-Control', 'public, max-age=86400');

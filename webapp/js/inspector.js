@@ -975,7 +975,10 @@ function formatInspectionItemByType(type, item, opts = {}) {
   const toFullUrl = (raw) => toPhotoFullUrl(baseUrl, raw);
   const getPhotoUrl = (photo) => {
     const raw = photo.file_url ?? photo.url ?? photo.thumb_url ?? '';
-    return toFullUrl(raw);
+    const full = toFullUrl(raw);
+    if (full) return full;
+    const thumbRaw = photo.thumbnail_url || (raw ? `/uploads/thumbs/thumb-${String(raw).replace(/^\/?uploads\//, '')}` : '');
+    return toFullUrl(thumbRaw);
   };
   const validPhotos = photos.filter((p) => p && getPhotoUrl(p));
   const photoThumbs = validPhotos.map((photo) => {
@@ -1368,7 +1371,12 @@ async function handleMeasurementPhotoUpload(type, inputElement, slotIndex) {
         if (!Array.isArray(InspectorState.measurementPhotos[type])) {
           InspectorState.measurementPhotos[type] = [];
         }
-        InspectorState.measurementPhotos[type][slotIndex] = { file: compressedFile, url, key };
+        InspectorState.measurementPhotos[type][slotIndex] = {
+          file: compressedFile,
+          url,
+          key,
+          thumbnail_url: uploadResult.thumbnail_url || null,
+        };
         toast('사진 업로드 완료!', 'success');
       } catch (error) {
         console.error('사진 업로드 실패:', error);
