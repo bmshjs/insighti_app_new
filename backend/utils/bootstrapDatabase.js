@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { restoreReferenceDataIfEmpty, restoreSampleCasesAndDefects, restoreReferenceData, countNonAdminHouseholds } = require('./restoreReferenceData');
+const { ensureInspectionSchema } = require('./ensureInspectionSchema');
 /**
  * DB 연결 후 스키마·점검원 계정·하자 카테고리를 idempotent 하게 준비합니다.
  */
@@ -67,8 +68,8 @@ async function bootstrapDatabase(pool) {
   const migrationFiles = [
     'scripts/init-db.sql',
     'scripts/ensure-core-schema.sql',
-    'scripts/migrate-phase1.sql',
     'scripts/ensure-inspection-schema.sql',
+    'scripts/migrate-phase1.sql',
     'scripts/migrate-inspector-registration.sql',
     'scripts/migrate-encrypt-personal-data.sql',
     'scripts/migrate-inspection-photos.sql',
@@ -92,6 +93,11 @@ async function bootstrapDatabase(pool) {
     for (const file of migrationFiles) {
       console.log(`[bootstrap] running ${file}`);
       await runSqlFile(client, file);
+    }
+
+    const inspectionSchema = await ensureInspectionSchema(pool);
+    if (!inspectionSchema.ok) {
+      console.warn('[bootstrap] inspection schema ensure incomplete');
     }
 
     const defectCount = await client.query('SELECT COUNT(*)::int AS n FROM defect');

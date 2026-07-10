@@ -3,9 +3,43 @@ const express = require('express');
 const pool = require('../database');
 const { authenticateToken, requireEquipmentAccess, requireInspectorAccess } = require('../middleware/auth');
 const { queryInspectionRows, groupInspectionRows } = require('../utils/inspectionQuery');
+const { ensureInspectionSchema } = require('../utils/ensureInspectionSchema');
 const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
+
+let inspectionSchemaReady = false;
+
+async function ensureInspectionSchemaMiddleware(req, res, next) {
+  if (req.method !== 'POST' && req.method !== 'PUT') {
+    return next();
+  }
+  try {
+    if (!inspectionSchemaReady) {
+      const result = await ensureInspectionSchema(pool);
+      inspectionSchemaReady = !!result.ok;
+      if (!inspectionSchemaReady) {
+        return res.status(503).json({
+          error: '점검 스키마를 준비하지 못했습니다. 잠시 후 다시 시도해주세요.',
+        });
+      }
+    }
+    next();
+  } catch (error) {
+    console.error('점검 스키마 보강 오류:', error);
+    res.status(500).json({
+      error: '서버 오류가 발생했습니다',
+      message: error.message,
+    });
+  }
+}
+
+router.use(ensureInspectionSchemaMiddleware);
+
+function inspectionError(res, error, label) {
+  console.error(`${label}:`, error);
+  res.status(500).json({ error: '서버 오류가 발생했습니다', message: error.message });
+}
 
 // 입력 검증 규칙
 const ValidationRules = {
@@ -68,8 +102,7 @@ router.post('/thermal', authenticateToken, requireInspectorAccess, async (req, r
     });
     
   } catch (error) {
-    console.error('열화상 점검 항목 생성 오류:', error);
-    res.status(500).json({ error: '서버 오류가 발생했습니다' });
+    inspectionError(res, error, '열화상 점검 항목 생성 오류');
   }
 });
 
@@ -98,8 +131,7 @@ router.post('/visual', authenticateToken, requireInspectorAccess, async (req, re
       message: '육안점검 항목이 저장되었습니다'
     });
   } catch (error) {
-    console.error('육안점검 항목 생성 오류:', error);
-    res.status(500).json({ error: '서버 오류가 발생했습니다' });
+    inspectionError(res, error, '육안점검 항목 생성 오류');
   }
 });
 
@@ -270,8 +302,7 @@ router.post('/air', authenticateToken, requireInspectorAccess, async (req, res) 
     }
     
   } catch (error) {
-    console.error('공기질 측정 등록 오류:', error);
-    res.status(500).json({ error: '서버 오류가 발생했습니다' });
+    inspectionError(res, error, '공기질 측정 등록 오류');
   }
 });
 
@@ -340,8 +371,7 @@ router.post('/radon', authenticateToken, requireInspectorAccess, async (req, res
     }
     
   } catch (error) {
-    console.error('라돈 측정 등록 오류:', error);
-    res.status(500).json({ error: '서버 오류가 발생했습니다' });
+    inspectionError(res, error, '라돈 측정 등록 오류');
   }
 });
 
@@ -450,8 +480,7 @@ router.post('/level', authenticateToken, requireInspectorAccess, async (req, res
     }
     
   } catch (error) {
-    console.error('레벨기 측정 등록 오류:', error);
-    res.status(500).json({ error: '서버 오류가 발생했습니다' });
+    inspectionError(res, error, '레벨기 측정 등록 오류');
   }
 });
 

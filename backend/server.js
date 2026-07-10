@@ -146,7 +146,7 @@ app.use('/api/sms', smsRoutes);
 app.use('/api/admin', adminRoutes); // NEW: Admin functions
 
 // Root endpoint (for Render health checks)
-const APP_VERSION = '4.1.7';
+const APP_VERSION = '4.1.8';
 
 app.get('/', (req, res) => {
   res.json({ 
@@ -198,44 +198,12 @@ app.post('/health/bootstrap-schema', async (req, res) => {
     return res.status(403).json({ error: 'Forbidden' });
   }
   const pool = require('./database');
-  const sqlPath = path.join(__dirname, 'scripts', 'ensure-inspection-schema.sql');
-  const sql = fs.readFileSync(sqlPath, 'utf8');
-  const statements = sql
-    .split(/;\s*\r?\n/)
-    .map((stmt) => stmt.replace(/--[^\n]*/g, '').trim())
-    .filter((stmt) => stmt.length > 0);
-  const client = await pool.connect();
-  const applied = [];
-  const skipped = [];
+  const { ensureInspectionSchema } = require('./utils/ensureInspectionSchema');
   try {
-    for (const statement of statements) {
-      try {
-        await client.query(statement);
-        applied.push(statement.slice(0, 60).replace(/\s+/g, ' '));
-      } catch (error) {
-        const msg = error.message || '';
-        if (
-          msg.includes('already exists') ||
-          msg.includes('duplicate key') ||
-          (msg.includes('does not exist') && msg.includes('constraint'))
-        ) {
-          skipped.push(msg.slice(0, 100));
-        } else {
-          throw error;
-        }
-      }
-    }
-    const check = await client.query("SELECT to_regclass('public.inspection_item') AS table_name");
-    res.json({
-      ok: true,
-      inspection_item: check.rows[0].table_name || null,
-      applied: applied.length,
-      skipped: skipped.length,
-    });
+    const result = await ensureInspectionSchema(pool);
+    res.json({ ok: result.ok, inspection_item: result.inspection_item || null });
   } catch (error) {
     res.status(500).json({ error: error.message });
-  } finally {
-    client.release();
   }
 });
 
@@ -321,11 +289,18 @@ try {
 const pool = require('./database');
 const { ensureInspectorHousehold } = require('./utils/ensureInspectorHousehold');
 const { bootstrapDatabase } = require('./utils/bootstrapDatabase');
+const { ensureInspectionSchema } = require('./utils/ensureInspectionSchema');
 
 async function prepareDatabase() {
   const bootstrap = await bootstrapDatabase(pool);
   if (!bootstrap.ok) {
     console.warn('[startup] DB bootstrap failed:', bootstrap.reason);
+  }
+  try {
+    const schema = await ensureInspectionSchema(pool);
+    console.log('[startup] inspection schema:', schema.ok ? 'ready' : 'incomplete');
+  } catch (error) {
+    console.warn('[startup] inspection schema ensure failed:', error.message);
   }
   await ensureInspectorHousehold(pool);
 }

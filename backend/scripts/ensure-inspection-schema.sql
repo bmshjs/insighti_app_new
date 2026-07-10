@@ -15,6 +15,12 @@ CREATE TABLE IF NOT EXISTS inspection_item (
 ALTER TABLE inspection_item ADD COLUMN IF NOT EXISTS defect_id TEXT;
 
 ALTER TABLE inspection_item DROP CONSTRAINT IF EXISTS inspection_item_type_check;
+ALTER TABLE inspection_item ADD CONSTRAINT inspection_item_type_check
+  CHECK (type IS NULL OR type IN ('thermal','air','radon','level','visual'));
+
+ALTER TABLE inspection_item DROP CONSTRAINT IF EXISTS inspection_item_result_check;
+ALTER TABLE inspection_item ADD CONSTRAINT inspection_item_result_check
+  CHECK (result IS NULL OR result IN ('normal','check','na'));
 
 CREATE INDEX IF NOT EXISTS idx_inspection_case ON inspection_item(case_id);
 CREATE INDEX IF NOT EXISTS idx_inspection_type ON inspection_item(type);
