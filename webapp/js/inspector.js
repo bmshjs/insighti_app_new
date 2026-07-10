@@ -982,7 +982,7 @@ function formatInspectionItemByType(type, item, opts = {}) {
     const fullUrl = getPhotoUrl(photo);
     if (!fullUrl) return '';
     const safe = (s) => String(s).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-    return `<span style="display:inline-block;width:48px;height:48px;background:#e5e7eb;border-radius:8px;overflow:hidden;margin:2px;"><img src="${safe(fullUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;cursor:pointer;" onclick="showImageModal('${safe(fullUrl)}')" title="사진" onerror="this.style.display='none'" referrerpolicy="no-referrer" /></span>`;
+    return `<span style="display:inline-block;width:48px;height:48px;background:#e5e7eb;border-radius:8px;overflow:hidden;margin:2px;position:relative;"><img src="${safe(fullUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;cursor:pointer;" onclick="showImageModal('${safe(fullUrl)}')" title="사진" referrerpolicy="no-referrer" onerror="this.style.opacity='0.3';this.title='사진을 불러올 수 없습니다';" /></span>`;
   }).filter(Boolean).join('');
   rows.push(`<tr><td class="ins-detail-label">사진</td><td>${validPhotos.length > 0 ? `${validPhotos.length}장 ${photoThumbs ? `<span class="gallery" style="display:inline-flex;gap:4px;margin-left:8px;flex-wrap:wrap;">${photoThumbs}</span>` : ''}` : '<span style="color:#9ca3af;">없음</span>'}</td></tr>`);
   const editBtn = (opts.showEdit && item.id) ? `<button type="button" class="button ghost" style="margin-top:6px;font-size:12px;margin-right:6px;" onclick="openInspectionEditModal('${item.id}')">수정</button>` : '';
@@ -1631,13 +1631,18 @@ async function saveDefectInspection() {
         : [];
       if (photos.length > 0 && response.item && response.item.id) {
         const itemId = response.item.id;
+        let photoSaveFailed = false;
         for (let i = 0; i < photos.length && i < 2; i++) {
           try {
             await api.addInspectionPhoto(itemId, photos[i].url, `사진 ${i + 1}`, i);
             console.log(`✅ 점검 사진 ${i + 1} 저장 완료`);
           } catch (photoError) {
+            photoSaveFailed = true;
             console.error('⚠️ 점검 사진 저장 실패:', photoError);
           }
+        }
+        if (photoSaveFailed) {
+          toast('점검결과는 저장됐으나 사진 저장에 실패했습니다. 다시 시도해주세요.', 'warning');
         }
       }
       if (measurementType) {

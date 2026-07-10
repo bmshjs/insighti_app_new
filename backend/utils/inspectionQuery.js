@@ -1,19 +1,23 @@
-function isMissingInspectionTableError(err) {
+function isMissingTableError(err, tableName) {
   const msg = (err && err.message) || '';
-  return msg.includes('inspection_item') && msg.includes('does not exist');
+  return msg.includes(tableName) && msg.includes('does not exist');
 }
 
-function buildInspectionSelectQuery({ whereClause, orderBy, useInspectionPhoto, useExtendedLevel, useProcessType }) {
+function isMissingInspectionTableError(err) {
+  return isMissingTableError(err, 'inspection_item');
+}
+
+function buildInspectionSelectQuery({ whereClause, orderBy, useExtendedLevel, useProcessType, useThermalPhoto }) {
   const levelCols = useExtendedLevel
     ? `lm.point1_left_mm, lm.point1_right_mm, lm.point2_left_mm, lm.point2_right_mm,
        lm.point3_left_mm, lm.point3_right_mm, lm.point4_left_mm, lm.point4_right_mm,
        lm.reference_mm,`
     : '';
   const processCol = useProcessType ? 'am.process_type,' : '';
-  const photoSub = useInspectionPhoto
-    ? `(SELECT json_agg(json_build_object('id', ip.id, 'file_url', ip.file_url, 'caption', ip.caption, 'sort_order', ip.sort_order) ORDER BY ip.sort_order)
-         FROM inspection_photo ip WHERE ip.item_id = ii.id) as inspection_photos`
-    : 'NULL::json as inspection_photos';
+  const thermalSub = useThermalPhoto
+    ? `(SELECT json_agg(json_build_object('file_url', tp.file_url, 'caption', tp.caption, 'shot_at', tp.shot_at))
+         FROM thermal_photo tp WHERE tp.item_id = ii.id) as thermal_photos`
+    : 'NULL::json as thermal_photos';
 
   return `
     SELECT
@@ -23,9 +27,7 @@ function buildInspectionSelectQuery({ whereClause, orderBy, useInspectionPhoto, 
       rm.radon, rm.unit_radon,
       lm.left_mm, lm.right_mm,
       ${levelCols}
-      (SELECT json_agg(json_build_object('file_url', tp.file_url, 'caption', tp.caption, 'shot_at', tp.shot_at))
-       FROM thermal_photo tp WHERE tp.item_id = ii.id) as thermal_photos,
-      ${photoSub}
+      ${thermalSub}
     FROM inspection_item ii
     LEFT JOIN air_measure am ON ii.id = am.item_id
     LEFT JOIN radon_measure rm ON ii.id = rm.item_id
@@ -89,25 +91,68 @@ function groupInspectionRows(rows, { fixedTypes } = {}) {
   }, {});
 }
 
+async function loadInspectionPhotosForItems(pool, itemIds) {
+  if (!itemIds.length) return {};
+  try {
+    const result = await pool.query(
+      `SELECT id, item_id, file_url, caption, sort_order
+       FROM inspection_photo
+       WHERE item_id = ANY($1::text[])
+       ORDER BY sort_order ASC, created_at ASC`,
+      [itemIds]
+    );
+    const map = {};
+    for (const row of result.rows) {
+      if (!map[row.item_id]) map[row.item_id] = [];
+      map[row.item_id].push({
+        id: row.id,
+        file_url: row.file_url,
+        caption: row.caption,
+        sort_order: row.sort_order,
+      });
+    }
+    return map;
+  } catch (err) {
+    if (isMissingTableError(err, 'inspection_photo')) {
+      return {};
+    }
+    throw err;
+  }
+}
+
+async function enrichRowsWithPhotos(pool, rows) {
+  const itemIds = (rows || []).map((r) => r.id).filter(Boolean);
+  const photoMap = await loadInspectionPhotosForItems(pool, itemIds);
+  return (rows || []).map((row) => {
+    const fromDb = photoMap[row.id];
+    if (!fromDb || fromDb.length === 0) return row;
+    const existing = toPhotoArr(row.inspection_photos);
+    if (existing.length > 0) return row;
+    return { ...row, inspection_photos: fromDb };
+  });
+}
+
 async function queryInspectionRows(pool, { whereClause, params, orderBy }) {
   const attempts = [
-    { useInspectionPhoto: true, useExtendedLevel: true, useProcessType: true },
-    { useInspectionPhoto: false, useExtendedLevel: true, useProcessType: true },
-    { useInspectionPhoto: false, useExtendedLevel: false, useProcessType: false },
+    { useExtendedLevel: true, useProcessType: true, useThermalPhoto: true },
+    { useExtendedLevel: true, useProcessType: false, useThermalPhoto: true },
+    { useExtendedLevel: false, useProcessType: false, useThermalPhoto: false },
   ];
 
   let lastErr;
   for (const opts of attempts) {
     try {
       const sql = buildInspectionSelectQuery({ ...opts, whereClause, orderBy });
-      return await pool.query(sql, params);
+      const result = await pool.query(sql, params);
+      result.rows = await enrichRowsWithPhotos(pool, result.rows);
+      return result;
     } catch (err) {
       lastErr = err;
       if (isMissingInspectionTableError(err)) {
         return { rows: [] };
       }
       console.warn(
-        `Inspection query fallback (photo=${opts.useInspectionPhoto}, level=${opts.useExtendedLevel}, process=${opts.useProcessType}):`,
+        `Inspection query fallback (level=${opts.useExtendedLevel}, process=${opts.useProcessType}, thermal=${opts.useThermalPhoto}):`,
         err.message
       );
     }
@@ -124,4 +169,5 @@ module.exports = {
   groupInspectionRows,
   attachPhotos,
   normalizeLevelItem,
+  loadInspectionPhotosForItems,
 };
