@@ -6,6 +6,7 @@ const { authenticateToken } = require('../middleware/auth');
 const pdfGenerator = require('../utils/pdfmakeGenerator');
 const finalReportGenerator = require('../utils/finalReportGenerator');
 const { buildInspectionExportZip } = require('../utils/inspectionExport');
+const { queryInspectionRows } = require('../utils/inspectionQuery');
 const smsService = require('../utils/smsService');
 const { decrypt } = require('../utils/encryption');
 const fs = require('fs');
@@ -493,27 +494,11 @@ function getResultText(result) {
 
 // 세대(household) 기준 점검결과만 조회 — 최종보고서용 (하자 무관, 타입별 N건)
 async function loadHouseholdInspectionsForReport(householdId) {
-  const query = `
-    SELECT
-      ii.id, ii.type, ii.defect_id, ii.location, ii.trade, ii.serial_no, ii.note, ii.result, ii.created_at,
-      am.process_type, am.tvoc, am.hcho, am.co2, am.unit_tvoc, am.unit_hcho,
-      rm.radon, rm.unit_radon,
-      lm.left_mm, lm.right_mm,
-      lm.point1_left_mm, lm.point1_right_mm, lm.point2_left_mm, lm.point2_right_mm,
-      lm.point3_left_mm, lm.point3_right_mm, lm.point4_left_mm, lm.point4_right_mm,
-      lm.reference_mm,
-      (SELECT json_agg(json_build_object('file_url', tp.file_url, 'caption', tp.caption, 'shot_at', tp.shot_at))
-       FROM thermal_photo tp WHERE tp.item_id = ii.id) as thermal_photos,
-      (SELECT json_agg(json_build_object('file_url', ip.file_url, 'caption', ip.caption, 'sort_order', ip.sort_order) ORDER BY ip.sort_order)
-       FROM inspection_photo ip WHERE ip.item_id = ii.id) as inspection_photos
-    FROM inspection_item ii
-    LEFT JOIN air_measure am ON ii.id = am.item_id
-    LEFT JOIN radon_measure rm ON ii.id = rm.item_id
-    LEFT JOIN level_measure lm ON ii.id = lm.item_id
-    WHERE ii.case_id IN (SELECT id FROM case_header WHERE household_id = $1)
-    ORDER BY ii.created_at ASC
-  `;
-  const result = await pool.query(query, [householdId]);
+  const result = await queryInspectionRows(pool, {
+    whereClause: 'ii.case_id IN (SELECT id FROM case_header WHERE household_id = $1)',
+    params: [householdId],
+    orderBy: 'ii.created_at ASC',
+  });
   const visual = [], thermal = [], air = [], radon = [], level = [];
   (result.rows || []).forEach((row) => {
     const base = {
@@ -623,8 +608,7 @@ async function loadHouseholdReportData(householdId) {
     : (household.phone || '');
 
   const defectsResult = await pool.query(
-    `SELECT d.id, d.case_id, d.location, d.trade, d.content, d.memo,
-            d.photo_near, d.photo_far, d.created_at,
+    `SELECT d.id, d.case_id, d.location, d.trade, d.content, d.memo, d.created_at,
             c.type as case_type, c.created_at as case_created_at
      FROM defect d
      JOIN case_header c ON d.case_id = c.id
@@ -634,26 +618,6 @@ async function loadHouseholdReportData(householdId) {
   );
   const defects = defectsResult.rows || [];
 
-  const inspectionItemQuery = `
-    SELECT ii.type, ii.location, ii.trade, ii.serial_no, ii.note, ii.result, ii.created_at,
-           am.process_type, am.tvoc, am.hcho, am.co2, am.unit_tvoc, am.unit_hcho,
-           rm.radon, rm.unit_radon,
-           lm.left_mm, lm.right_mm,
-           lm.point1_left_mm, lm.point1_right_mm, lm.point2_left_mm, lm.point2_right_mm,
-           lm.point3_left_mm, lm.point3_right_mm, lm.point4_left_mm, lm.point4_right_mm,
-           lm.reference_mm,
-           (SELECT json_agg(json_build_object('file_url', tp.file_url, 'caption', tp.caption, 'shot_at', tp.shot_at))
-            FROM thermal_photo tp WHERE tp.item_id = ii.id) as thermal_photos,
-           (SELECT json_agg(json_build_object('file_url', ip.file_url, 'caption', ip.caption, 'sort_order', ip.sort_order) ORDER BY ip.sort_order)
-            FROM inspection_photo ip WHERE ip.item_id = ii.id) as inspection_photos
-    FROM inspection_item ii
-    LEFT JOIN air_measure am ON ii.id = am.item_id
-    LEFT JOIN radon_measure rm ON ii.id = rm.item_id
-    LEFT JOIN level_measure lm ON ii.id = lm.item_id
-    WHERE ii.defect_id = $1
-    ORDER BY ii.created_at ASC
-  `;
-
   let totalThermal = 0, totalAir = 0, totalRadon = 0, totalLevel = 0;
 
   for (const defect of defects) {
@@ -662,14 +626,12 @@ async function loadHouseholdReportData(householdId) {
       [defect.id]
     );
     defect.photos = photoResult.rows || [];
-    if (defect.photo_far && !defect.photos.some((p) => p.kind === 'far')) {
-      defect.photos.push({ kind: 'far', url: defect.photo_far });
-    }
-    if (defect.photo_near && !defect.photos.some((p) => p.kind === 'near')) {
-      defect.photos.push({ kind: 'near', url: defect.photo_near });
-    }
 
-    const itemResult = await pool.query(inspectionItemQuery, [defect.id]);
+    const itemResult = await queryInspectionRows(pool, {
+      whereClause: 'ii.defect_id = $1',
+      params: [defect.id],
+      orderBy: 'ii.created_at ASC',
+    });
     const air = [], radon = [], level = [], thermal = [], visual = [];
     const itemPhotos = (item) => {
       const ip = (item.inspection_photos && Array.isArray(item.inspection_photos))
