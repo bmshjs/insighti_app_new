@@ -100,19 +100,9 @@ function collectPhotoUrls(item) {
   return photos.map(getPhotoUrl).filter(Boolean);
 }
 
-function wipeAndText(page, font, pos, text, size = LAYOUT.FIELD.fontSize) {
+/** 데이터 필드: 강조색(흰색 덮기) 없이 검정 텍스트만 출력 */
+function drawDataText(page, font, pos, text, size = LAYOUT.FIELD.fontSize) {
   if (!pos) return;
-  const pad = LAYOUT.FIELD.wipePad;
-  const c = LAYOUT.FIELD.wipeColor;
-  const w = pos.w || 100;
-  const h = pos.h || 18;
-  page.drawRectangle({
-    x: pos.x - pad,
-    y: pos.y - 6,
-    width: w + pad * 2,
-    height: h + pad * 2,
-    color: rgb(c.r, c.g, c.b),
-  });
   page.drawText(safe(text), { x: pos.x, y: pos.y, size, font, color: TEXT_COLOR() });
 }
 
@@ -136,20 +126,13 @@ async function embedAndDrawPhoto(pdfDoc, page, fileUrl, rect) {
         image = await pdfDoc.embedPng(buf);
       }
     }
-    const dims = image.scale(1);
-    const scale = Math.min(rect.w / dims.width, rect.h / dims.height);
-    const drawW = dims.width * scale;
-    const drawH = dims.height * scale;
-    const dx = rect.x + (rect.w - drawW) / 2;
-    const dy = rect.y + (rect.h - drawH) / 2;
-    page.drawRectangle({
+    // 지정 슬롯(12.2×3.3cm)에 맞게 꽉 채움
+    page.drawImage(image, {
       x: rect.x,
       y: rect.y,
       width: rect.w,
       height: rect.h,
-      color: rgb(1, 1, 1),
     });
-    page.drawImage(image, { x: dx, y: dy, width: drawW, height: drawH });
     return true;
   } catch (e) {
     console.warn('[final-report-0620] photo embed failed:', fileUrl, e.message);
@@ -157,38 +140,26 @@ async function embedAndDrawPhoto(pdfDoc, page, fileUrl, rect) {
   }
 }
 
-async function drawBlockPhotos(pdfDoc, page, photoUrls, rect, maxPhotos = 2) {
-  const urls = (photoUrls || []).filter(Boolean).slice(0, maxPhotos);
-  if (!urls.length || !rect) return;
-  if (urls.length === 1) {
-    await embedAndDrawPhoto(pdfDoc, page, urls[0], rect);
-    return;
-  }
-  const gap = 4;
-  const slotW = (rect.w - gap) / urls.length;
-  for (let i = 0; i < urls.length; i++) {
-    await embedAndDrawPhoto(pdfDoc, page, urls[i], {
-      x: rect.x + i * (slotW + gap),
-      y: rect.y,
-      w: slotW,
-      h: rect.h,
-    });
+function buildPhotoSlots(block, urlCount) {
+  if (!block || urlCount <= 0) return [];
+  const slots = [];
+  if (block.photoNear) slots.push(block.photoNear);
+  if (block.photoFar && urlCount > 1) slots.push(block.photoFar);
+  return slots.slice(0, urlCount);
+}
+
+async function drawBlockPhotos(pdfDoc, page, photoUrls, block) {
+  const urls = (photoUrls || []).filter(Boolean).slice(0, 2);
+  if (!urls.length || !block) return;
+  const slots = buildPhotoSlots(block, urls.length);
+  for (let i = 0; i < Math.min(urls.length, slots.length); i++) {
+    await embedAndDrawPhoto(pdfDoc, page, urls[i], slots[i]);
   }
 }
 
-function wipeCoverLine(page, font, lineDef, text) {
+function drawCoverLine(page, font, lineDef, text) {
   if (!lineDef) return;
-  const pad = LAYOUT.FIELD.wipePad;
-  const c = LAYOUT.FIELD.wipeColor;
   const size = LAYOUT.FIELD.fontSize;
-  const wipeH = lineDef.wipeH || 22;
-  page.drawRectangle({
-    x: lineDef.x - pad,
-    y: lineDef.y - 6,
-    width: lineDef.wipeW + pad * 2,
-    height: wipeH + pad * 2,
-    color: rgb(c.r, c.g, c.b),
-  });
   page.drawText(safe(text), { x: lineDef.x, y: lineDef.y, size, font, color: TEXT_COLOR() });
 }
 
@@ -199,9 +170,9 @@ function fillCover(page, font, data) {
   const ho = safe(data.ho);
   const name = safe(data.name);
 
-  wipeCoverLine(page, font, c.complexLine, `아파트명 : ${complex}`);
-  wipeCoverLine(page, font, c.donghoLine, `동,  호  수 :  ${dong} 동 ${ho}호`);
-  wipeCoverLine(page, font, c.nameLine, `입주자 성함  :  ${name}`);
+  drawCoverLine(page, font, c.complexLine, `아파트명 : ${complex}`);
+  drawCoverLine(page, font, c.donghoLine, `동,  호  수 :  ${dong} 동 ${ho}호`);
+  drawCoverLine(page, font, c.nameLine, `입주자 성함  :  ${name}`);
 }
 
 async function fillVisualPage(pdfDoc, page, font, items) {
@@ -213,11 +184,11 @@ async function fillVisualPage(pdfDoc, page, font, items) {
     const item = list[i];
     const b = blocks[i];
     if (!b) continue;
-    wipeAndText(page, font, { ...b.location, w: 80, h: 18 }, item?.location);
-    wipeAndText(page, font, { ...b.trade, w: 80, h: 18 }, item?.trade);
-    wipeAndText(page, font, { ...b.content, w: 100, h: 18 }, item?.note ?? item?.content);
-    wipeAndText(page, font, { ...b.note, w: 100, h: 18 }, item?.result_text ?? item?.result ?? item?.memo);
-    await drawBlockPhotos(pdfDoc, page, collectPhotoUrls(item), b.photo, 2);
+    drawDataText(page, font, b.location, item?.location);
+    drawDataText(page, font, b.trade, item?.trade);
+    drawDataText(page, font, b.content, item?.note ?? item?.content);
+    drawDataText(page, font, b.note, item?.result_text ?? item?.result ?? item?.memo);
+    await drawBlockPhotos(pdfDoc, page, collectPhotoUrls(item), b);
   }
 }
 
@@ -232,11 +203,11 @@ async function fillThermalPage(pdfDoc, page, font, items) {
     if (!b) continue;
     const loc = splitLocation(item?.location);
     const trade = splitTrade(item?.trade);
-    wipeAndText(page, font, { ...b.location, w: 60, h: 18 }, loc.main);
-    if (b.locationNo && loc.sub) wipeAndText(page, font, { ...b.locationNo, w: 24, h: 18 }, loc.sub);
-    wipeAndText(page, font, { ...b.trade, w: 100, h: 18 }, `${trade.main}${trade.sub}`);
-    wipeAndText(page, font, { ...b.result, w: 100, h: 18 }, item?.result_text ?? item?.result ?? item?.note);
-    await drawBlockPhotos(pdfDoc, page, collectPhotoUrls(item), b.photo, 2);
+    drawDataText(page, font, b.location, loc.main);
+    if (b.locationNo && loc.sub) drawDataText(page, font, b.locationNo, loc.sub);
+    drawDataText(page, font, b.trade, `${trade.main}${trade.sub}`);
+    drawDataText(page, font, b.result, item?.result_text ?? item?.result ?? item?.note);
+    await drawBlockPhotos(pdfDoc, page, collectPhotoUrls(item), b);
   }
 }
 
@@ -250,22 +221,17 @@ async function fillAirPage(pdfDoc, page, font, rows) {
     const b = blocks[i];
     if (!b) continue;
     const loc = splitLocation(row.air?.location || row.radon?.location);
-    wipeAndText(page, font, { ...b.location, w: 60, h: 18 }, loc.main);
-    if (b.locationNo && loc.sub) wipeAndText(page, font, { ...b.locationNo, w: 24, h: 18 }, loc.sub);
-    wipeAndText(
+    drawDataText(page, font, b.location, loc.main);
+    if (b.locationNo && loc.sub) drawDataText(page, font, b.locationNo, loc.sub);
+    drawDataText(
       page,
       font,
-      { ...b.result, w: 60, h: 18 },
+      b.result,
       row.air?.result_text ?? row.air?.result ?? row.radon?.result_text ?? row.radon?.result
     );
-    wipeAndText(page, font, { ...b.tvoc, w: 60, h: 18 }, row.air?.tvoc != null ? String(row.air.tvoc) : '-');
-    wipeAndText(page, font, { ...b.hcho, w: 60, h: 18 }, row.air?.hcho != null ? String(row.air.hcho) : '-');
-    wipeAndText(page, font, { ...b.radon, w: 50, h: 18 }, row.radon?.radon != null ? String(row.radon.radon) : '-');
-    const airPhotos = [
-      ...collectPhotoUrls(row.air),
-      ...collectPhotoUrls(row.radon),
-    ];
-    await drawBlockPhotos(pdfDoc, page, airPhotos, b.photo, 1);
+    drawDataText(page, font, b.tvoc, row.air?.tvoc != null ? String(row.air.tvoc) : '-');
+    drawDataText(page, font, b.hcho, row.air?.hcho != null ? String(row.air.hcho) : '-');
+    drawDataText(page, font, b.radon, row.radon?.radon != null ? String(row.radon.radon) : '-');
   }
 }
 
@@ -279,13 +245,12 @@ async function fillLevelPage(pdfDoc, page, font, items) {
     const b = blocks[i];
     if (!b) continue;
     const loc = splitLocation(item?.location);
-    wipeAndText(page, font, { ...b.location, w: 60, h: 18 }, loc.main);
-    wipeAndText(page, font, { ...b.result, w: 60, h: 18 }, item?.result_text ?? item?.result);
-    wipeAndText(page, font, { ...b.p1, w: 36, h: 18 }, item?.point1_left_mm ?? item?.left_mm);
-    wipeAndText(page, font, { ...b.p2, w: 36, h: 18 }, item?.point2_left_mm);
-    wipeAndText(page, font, { ...b.p3, w: 36, h: 18 }, item?.point3_left_mm);
-    wipeAndText(page, font, { ...b.p4, w: 36, h: 18 }, item?.point4_left_mm);
-    await drawBlockPhotos(pdfDoc, page, collectPhotoUrls(item), b.photo, 1);
+    drawDataText(page, font, b.location, loc.main);
+    drawDataText(page, font, b.result, item?.result_text ?? item?.result);
+    drawDataText(page, font, b.p1, item?.point1_left_mm ?? item?.left_mm);
+    drawDataText(page, font, b.p2, item?.point2_left_mm);
+    drawDataText(page, font, b.p3, item?.point3_left_mm);
+    drawDataText(page, font, b.p4, item?.point4_left_mm);
   }
 }
 
