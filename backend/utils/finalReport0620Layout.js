@@ -26,10 +26,22 @@ const PHOTO_AREA_H = Math.round(6.7 * CM_TO_PT * 10) / 10; // 189.9
 const VISUAL_PHOTO_LEFT_X = 64.2;
 const THERMAL_PHOTO_LEFT_X = 64.2;
 
+function cmToPt(cm) {
+  return Math.round(cm * CM_TO_PT * 10) / 10;
+}
+
 function dualPhotoSlots(leftX, bottomY) {
   return {
     photoNear: { x: leftX, y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
     photoFar: { x: leftX + PHOTO_SLOT_W, y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+  };
+}
+
+/** 육안점검 사진: 1번 0.5cm, 2번 2.3cm 좌측 보정 */
+function visualDualPhotoSlots(leftX, bottomY) {
+  return {
+    photoNear: { x: leftX - cmToPt(0.5), y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+    photoFar: { x: leftX + PHOTO_SLOT_W - cmToPt(2.3), y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
   };
 }
 
@@ -45,22 +57,22 @@ const VISUAL_BLOCKS = [
   {
     location: { x: 437.2, y: 927.5 }, trade: leftIndentField(95.2, 767.4),
     content: leftIndentField(329, 767.4), note: leftIndentField(83, 739.5),
-    ...dualPhotoSlots(VISUAL_PHOTO_LEFT_X, 806),
+    ...visualDualPhotoSlots(VISUAL_PHOTO_LEFT_X, 806),
   },
   {
     location: { x: 435.7, y: 688.8 }, trade: leftIndentField(93.6, 528.7),
     content: leftIndentField(328, 528.7), note: leftIndentField(82, 500.8),
-    ...dualPhotoSlots(VISUAL_PHOTO_LEFT_X, 567),
+    ...visualDualPhotoSlots(VISUAL_PHOTO_LEFT_X, 567),
   },
   {
     location: { x: 434.1, y: 450.1 }, trade: leftIndentField(92, 290),
     content: leftIndentField(326, 290), note: leftIndentField(80, 262.2),
-    ...dualPhotoSlots(VISUAL_PHOTO_LEFT_X, 328),
+    ...visualDualPhotoSlots(VISUAL_PHOTO_LEFT_X, 328),
   },
   {
     location: { x: 432.5, y: 211.4 }, trade: leftIndentField(90.5, 51.3),
     content: leftIndentField(325, 51.3), note: leftIndentField(78, 23.5),
-    ...dualPhotoSlots(VISUAL_PHOTO_LEFT_X, 89),
+    ...visualDualPhotoSlots(VISUAL_PHOTO_LEFT_X, 89),
   },
 ];
 
