@@ -61,6 +61,16 @@ function getAirRows(reportData) {
   return rows;
 }
 
+function getAirType(row) {
+  const air = row?.air;
+  if (!air) return '-';
+  return air.process_type_label ?? air.process_type ?? '-';
+}
+
+function getAirMemo(row) {
+  return row?.air?.note ?? row?.radon?.note ?? '-';
+}
+
 function resolveKoreanFontPath() {
   const candidates = [
     path.join(FONTS_DIR, 'malgun.ttf'),
@@ -259,6 +269,8 @@ async function fillAirPage(pdfDoc, page, font, rows) {
       b.result,
       row.air?.result_text ?? row.air?.result ?? row.radon?.result_text ?? row.radon?.result
     );
+    drawDataText(page, font, b.type, getAirType(row));
+    drawDataText(page, font, b.memo, getAirMemo(row));
     drawDataText(page, font, b.tvoc, row.air?.tvoc != null ? String(row.air.tvoc) : '-');
     drawDataText(page, font, b.hcho, row.air?.hcho != null ? String(row.air.hcho) : '-');
     drawDataText(page, font, b.radon, row.radon?.radon != null ? String(row.radon.radon) : '-');
@@ -277,6 +289,8 @@ async function fillLevelPage(pdfDoc, page, font, items) {
     const loc = splitLocation(item?.location);
     drawDataText(page, font, b.location, loc.main);
     drawDataText(page, font, b.result, item?.result_text ?? item?.result);
+    drawDataText(page, font, b.type, item?.trade);
+    drawDataText(page, font, b.memo, item?.note);
     drawDataText(page, font, b.p1, item?.point1_left_mm ?? item?.left_mm);
     drawDataText(page, font, b.p2, item?.point2_left_mm);
     drawDataText(page, font, b.p3, item?.point3_left_mm);

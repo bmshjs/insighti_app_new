@@ -32,13 +32,25 @@ const sample = {
     { location: '침실1', trade: '좌측벽 하부', result_text: '이상없음', photos: [] },
   ],
   air_measurements: [
-    { location: '침실1', result_text: '정상', tvoc: 1.176, hcho: 0.121, photos: [] },
+    {
+      location: '침실1',
+      trade: '바닥',
+      result_text: '정상',
+      process_type: 'flush_out',
+      process_type_label: 'Flush-out',
+      note: '공기질 양호',
+      tvoc: 1.176,
+      hcho: 0.121,
+      photos: [],
+    },
   ],
   radon_measurements: [{ location: '침실1', radon: 134, photos: [] }],
   level_measurements: [
     {
       location: '침실1',
+      trade: '바닥',
       result_text: '정상',
+      note: '수평 양호',
       point1_left_mm: 141,
       point2_left_mm: 140,
       point3_left_mm: 142,
