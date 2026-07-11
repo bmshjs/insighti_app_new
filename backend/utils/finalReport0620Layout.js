@@ -39,26 +39,26 @@ const COVER = {
   nameLine: { x: 18.1, y: 129.1, wipeW: 200, wipeH: 22 },
 };
 
-/** 육안 점검 page 2 — content 좌측정렬, note(특이사항)만 3cm 들여 좌측정렬 */
+/** 육안 점검 page 2 — content(하자내용)·note(특이사항) 열 시작 후 3cm 들여 좌측정렬 */
 const VISUAL_BLOCKS = [
   {
     location: { x: 437.2, y: 927.5 }, trade: { x: 213.6, y: 767.4 },
-    content: { x: 329, y: 767.4, align: 'left' }, note: leftIndentField(329, 739.5),
+    content: leftIndentField(329, 767.4), note: leftIndentField(329, 739.5),
     ...dualPhotoSlots(VISUAL_PHOTO_LEFT_X, 806),
   },
   {
     location: { x: 435.7, y: 688.8 }, trade: { x: 212, y: 528.7 },
-    content: { x: 328, y: 528.7, align: 'left' }, note: leftIndentField(328, 500.8),
+    content: leftIndentField(328, 528.7), note: leftIndentField(328, 500.8),
     ...dualPhotoSlots(VISUAL_PHOTO_LEFT_X, 567),
   },
   {
     location: { x: 434.1, y: 450.1 }, trade: { x: 210.4, y: 290 },
-    content: { x: 326, y: 290, align: 'left' }, note: leftIndentField(326, 262.2),
+    content: leftIndentField(326, 290), note: leftIndentField(326, 262.2),
     ...dualPhotoSlots(VISUAL_PHOTO_LEFT_X, 328),
   },
   {
     location: { x: 432.5, y: 211.4 }, trade: { x: 208.9, y: 51.3 },
-    content: { x: 325, y: 51.3, align: 'left' }, note: leftIndentField(325, 23.5),
+    content: leftIndentField(325, 51.3), note: leftIndentField(325, 23.5),
     ...dualPhotoSlots(VISUAL_PHOTO_LEFT_X, 89),
   },
 ];
