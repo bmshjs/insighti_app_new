@@ -2,7 +2,7 @@
  * 종합점검보고서_0711.pdf 템플릿 필드 좌표 (A4 794×1123pt)
  * y: PDF 좌하단 원점 기준 (사각형 bottom-left)
  *
- * 사진: 육안·열화상만. 좌/우 2칸(각 10×3.3cm), 시작 x좌표는 열화상 기준으로 통일.
+ * 사진: 육안·열화상만. 좌/우 2칸(각 10.8×3.3cm), 시작 x좌표는 열화상 기준으로 통일.
  */
 const PAGE_WIDTH = 794;
 const PAGE_HEIGHT = 1123;
@@ -15,11 +15,12 @@ const INDENT_3CM = Math.round(3 * CM_TO_PT * 10) / 10; // 85.0
 function leftIndentField(colLeft, y) {
   return { x: colLeft + INDENT_3CM, y, align: 'left' };
 }
-/** 슬롯 1개: 10cm × 3.3cm */
-const PHOTO_SLOT_W = Math.round(10 * CM_TO_PT * 10) / 10; // 283.5
+/** 슬롯 1개: 10.8cm × 3.3cm (2번 사진 시작 x는 10cm 기준 유지) */
+const PHOTO_SLOT_W = Math.round(10.8 * CM_TO_PT * 10) / 10; // 306.1
+const PHOTO_SLOT_W_FOR_FAR_X = Math.round(10 * CM_TO_PT * 10) / 10; // 283.5
 const PHOTO_SLOT_H = Math.round(3.3 * CM_TO_PT * 10) / 10; // 93.5
-/** 전체 사진 영역: 20cm × 6.7cm */
-const PHOTO_AREA_W = PHOTO_SLOT_W * 2; // 567
+/** 전체 사진 영역: 21.6cm × 6.7cm */
+const PHOTO_AREA_W = PHOTO_SLOT_W * 2; // 612.3
 const PHOTO_AREA_H = Math.round(6.7 * CM_TO_PT * 10) / 10; // 189.9
 
 // 육안·열화상 사진 시작 x좌표 동일 (열화상 기준)
@@ -33,7 +34,7 @@ function cmToPt(cm) {
 function dualPhotoSlots(leftX, bottomY) {
   return {
     photoNear: { x: leftX, y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
-    photoFar: { x: leftX + PHOTO_SLOT_W, y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+    photoFar: { x: leftX + PHOTO_SLOT_W_FOR_FAR_X, y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
   };
 }
 
@@ -41,7 +42,7 @@ function dualPhotoSlots(leftX, bottomY) {
 function visualDualPhotoSlots(leftX, bottomY) {
   return {
     photoNear: { x: leftX - cmToPt(0.5) + cmToPt(1), y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
-    photoFar: { x: leftX + PHOTO_SLOT_W - cmToPt(2.3) + cmToPt(4.6), y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+    photoFar: { x: leftX + PHOTO_SLOT_W_FOR_FAR_X - cmToPt(2.3) + cmToPt(4.6), y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
   };
 }
 
@@ -49,7 +50,7 @@ function visualDualPhotoSlots(leftX, bottomY) {
 function thermalDualPhotoSlots(leftX, bottomY) {
   return {
     photoNear: { x: leftX, y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
-    photoFar: { x: leftX + PHOTO_SLOT_W + cmToPt(2), y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+    photoFar: { x: leftX + PHOTO_SLOT_W_FOR_FAR_X + cmToPt(2), y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
   };
 }
 
