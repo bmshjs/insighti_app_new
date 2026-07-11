@@ -223,7 +223,10 @@ router.post('/generate', authenticateToken, async (req, res) => {
       const reportPath = pdfGenerator.getReportPath(pdfResult.filename);
       if (fs.existsSync(reportPath)) {
         const buf = fs.readFileSync(reportPath);
-        res.setHeader('Content-Type', 'application/pdf');
+        const isPptx = pdfResult.filename.endsWith('.pptx');
+        res.setHeader('Content-Type', isPptx
+          ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+          : 'application/pdf');
         res.setHeader('X-Report-Filename', pdfResult.filename);
         return res.send(buf);
       }
@@ -247,7 +250,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
     console.error('PDF generation error:', error);
     res.status(500).json({
       success: false,
-      error: 'PDF generation failed',
+      error: 'Report generation failed',
       message: error.message
     });
   }
@@ -369,9 +372,15 @@ router.post('/send', authenticateToken, async (req, res) => {
   }
 });
 
-// PDF 전용: .pdf 확장자만 허용 (범용적으로 열리는 포맷만 지원)
-function isPdfFilename(filename) {
-  return typeof filename === 'string' && filename.endsWith('.pdf');
+function isReportFilename(filename) {
+  return typeof filename === 'string' && (filename.endsWith('.pdf') || filename.endsWith('.pptx'));
+}
+
+function getReportContentType(filename) {
+  if (filename.endsWith('.pptx')) {
+    return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+  }
+  return 'application/pdf';
 }
 
 // Preview PDF report (browser view)
@@ -383,8 +392,8 @@ router.get('/preview-pdf/:filename', authenticateToken, async (req, res) => {
     if (!filename || filename.includes('..') || filename.includes('/')) {
       return res.status(400).json({ error: 'Invalid filename' });
     }
-    if (!isPdfFilename(filename)) {
-      return res.status(400).json({ error: 'Only PDF reports are supported. Use /reports/generate to create a PDF.' });
+    if (!isReportFilename(filename)) {
+      return res.status(400).json({ error: 'Only PDF or PPTX reports are supported. Use /reports/generate to create a report.' });
     }
 
     const reportPath = pdfGenerator.getReportPath(filename);
@@ -395,7 +404,7 @@ router.get('/preview-pdf/:filename', authenticateToken, async (req, res) => {
     }
 
     // Set headers for browser preview (inline)
-    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Type', getReportContentType(filename));
     // 한글 파일명 대응: inline preview에서도 RFC5987 인코딩 사용
     res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(filename)}`);
     
@@ -421,8 +430,8 @@ router.get('/download/:filename', authenticateToken, async (req, res) => {
     if (!filename || filename.includes('..') || filename.includes('/')) {
       return res.status(400).json({ error: 'Invalid filename' });
     }
-    if (!isPdfFilename(filename)) {
-      return res.status(400).json({ error: 'Only PDF reports are supported. Use /reports/generate to create a PDF.' });
+    if (!isReportFilename(filename)) {
+      return res.status(400).json({ error: 'Only PDF or PPTX reports are supported. Use /reports/generate to create a report.' });
     }
 
     const reportPath = pdfGenerator.getReportPath(filename);
@@ -433,7 +442,7 @@ router.get('/download/:filename', authenticateToken, async (req, res) => {
     }
 
     // Set headers for file download (한글 파일명: 버퍼 전송으로 sendFile 인코딩 이슈 방지)
-    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Type', getReportContentType(filename));
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
     const buf = fs.readFileSync(reportPath);
     res.send(buf);
