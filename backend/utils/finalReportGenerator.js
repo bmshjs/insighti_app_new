@@ -4,9 +4,8 @@
  */
 const fs = require('fs');
 const path = require('path');
-const http = require('http');
-const https = require('https');
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
+const { loadImageBytes } = require('./photoPath');
 
 const LAYOUT = require('./finalReportLayout');
 
@@ -15,83 +14,8 @@ const TEMPLATE_DIR = path.join(__dirname, '..', 'templates');
 const REPORTS_DIR = path.join(__dirname, '..', 'reports');
 const FONTS_DIR = path.join(__dirname, '..', 'fonts');
 const ASSETS_DIR = path.join(__dirname, '..', 'assets');
-const config = require('../config');
-const UPLOADS_DIR = path.isAbsolute(config.upload.dir)
-  ? config.upload.dir
-  : path.join(__dirname, '..', config.upload.dir.replace(/^\.\//, ''));
 const AIR_DIAGRAM_PATH = path.join(ASSETS_DIR, 'air_quality_diagram.png');
 const LEVEL_DIAGRAM_PATH = path.join(ASSETS_DIR, 'level_diagram.png');
-
-const PUBLIC_BASE_URL = (process.env.BACKEND_URL || process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
-
-/** file_url(/uploads/xxx, uploads/xxx, http(s)://host/uploads/xxx) → 서버 내 절대 경로. 없으면 null */
-function getPhotoPath(fileUrl) {
-  if (!fileUrl || typeof fileUrl !== 'string') return null;
-  let rel = String(fileUrl).trim();
-  // http(s)://host/uploads/xxx → /uploads/xxx
-  const urlMatch = rel.match(/^https?:\/\/[^/]+(\/uploads\/.+)$/i);
-  if (urlMatch) rel = urlMatch[1];
-  rel = rel.replace(/^\//, '');
-  if (!rel || !rel.startsWith('uploads')) return null;
-  // uploads/2024/photo.jpg 또는 uploads/photo.jpg
-  const sub = rel.replace(/^uploads\/?/, '') || rel;
-  let full = path.join(UPLOADS_DIR, sub);
-  if (fs.existsSync(full)) return full;
-  // fallback: 파일명만 사용 (uploads/ 직하위)
-  const baseName = path.basename(sub);
-  if (baseName && baseName !== sub) {
-    const alt = path.join(UPLOADS_DIR, baseName);
-    if (fs.existsSync(alt)) return alt;
-  }
-  return null;
-}
-
-/** 상대/절대 URL → HTTP(S) 전체 URL */
-function resolvePhotoHttpUrl(fileUrl) {
-  if (!fileUrl || typeof fileUrl !== 'string') return null;
-  const u = String(fileUrl).trim();
-  if (/^https?:\/\//i.test(u)) return u;
-  if (!PUBLIC_BASE_URL) return null;
-  return u.startsWith('/') ? `${PUBLIC_BASE_URL}${u}` : `${PUBLIC_BASE_URL}/${u}`;
-}
-
-function fetchUrlBuffer(url, redirects = 0) {
-  return new Promise((resolve) => {
-    if (!url || redirects > 5) return resolve(null);
-    const lib = url.startsWith('https') ? https : http;
-    lib.get(url, (res) => {
-      if ([301, 302, 307, 308].includes(res.statusCode) && res.headers.location) {
-        res.resume();
-        return resolve(fetchUrlBuffer(res.headers.location, redirects + 1));
-      }
-      if (res.statusCode !== 200) {
-        res.resume();
-        return resolve(null);
-      }
-      const chunks = [];
-      res.on('data', (c) => chunks.push(c));
-      res.on('end', () => resolve(Buffer.concat(chunks)));
-    }).on('error', () => resolve(null));
-  });
-}
-
-/** 로컬 uploads → 없으면 BACKEND_URL HTTP로 이미지 로드 */
-async function loadImageBytes(fileUrl) {
-  const localPath = getPhotoPath(fileUrl);
-  if (localPath && fs.existsSync(localPath)) {
-    try {
-      return fs.readFileSync(localPath);
-    } catch (_) {
-      /* try http */
-    }
-  }
-  const httpUrl = resolvePhotoHttpUrl(fileUrl);
-  if (httpUrl) {
-    const remote = await fetchUrlBuffer(httpUrl);
-    if (remote && remote.length > 100) return remote;
-  }
-  return null;
-}
 
 /** 사진 파일을 PDF에 임베드하고 페이지에 그리기. 실패 시 무시 */
 async function embedAndDrawPhoto(pdfDoc, page, fileUrl, x, y, w, h) {

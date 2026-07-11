@@ -1,11 +1,10 @@
 /**
  * 점검결과 내보내기: 엑셀(시트별 점검유형) + 사진(점검구분별 폴더) ZIP 생성
  */
-const fs = require('fs');
 const path = require('path');
 const ExcelJS = require('exceljs');
 const AdmZip = require('adm-zip');
-const { getPhotoPath } = require('./photoPath');
+const { loadImageBytes } = require('./photoPath');
 
 const TYPE_LABELS = { visual: '육안', thermal: '열화상', air: '공기질', radon: '라돈', level: '레벨기' };
 
@@ -25,7 +24,7 @@ async function buildInspectionExportZip(data, dong = '', ho = '') {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'InsightI';
 
-  const photoEntries = []; // { zipPath, localPath }
+  const photoEntries = []; // { zipPath, buffer }
 
   // 시트별 데이터 정의: [시트명, 배열, 컬럼 정의]
   const sheets = [
@@ -101,13 +100,7 @@ async function buildInspectionExportZip(data, dong = '', ho = '') {
         tags.push(tag);
         const fileUrl = p.file_url || p.url;
         if (fileUrl) {
-          const localPath = getPhotoPath(fileUrl);
-          if (localPath && fs.existsSync(localPath)) {
-            photoEntries.push({
-              zipPath: `${sheetName}/${tag}`,
-              localPath
-            });
-          }
+          photoEntries.push({ zipPath: `${sheetName}/${tag}`, fileUrl });
         }
       });
       const rowValues = rowFn(item, tags);
@@ -122,10 +115,10 @@ async function buildInspectionExportZip(data, dong = '', ho = '') {
   const xlsxBuf = await workbook.xlsx.writeBuffer();
   zip.addFile('점검내용.xlsx', Buffer.from(xlsxBuf));
 
-  for (const { zipPath, localPath } of photoEntries) {
+  for (const { zipPath, fileUrl } of photoEntries) {
     try {
-      const buf = fs.readFileSync(localPath);
-      zip.addFile(zipPath, buf);
+      const buf = await loadImageBytes(fileUrl);
+      if (buf && buf.length) zip.addFile(zipPath, buf);
     } catch (e) {
       // skip missing file
     }

@@ -146,7 +146,7 @@ app.use('/api/sms', smsRoutes);
 app.use('/api/admin', adminRoutes); // NEW: Admin functions
 
 // Root endpoint (for Render health checks)
-const APP_VERSION = '4.2.1';
+const APP_VERSION = '4.2.2';
 
 app.get('/', (req, res) => {
   res.json({ 
@@ -303,6 +303,15 @@ async function prepareDatabase() {
     console.warn('[startup] inspection schema ensure failed:', error.message);
   }
   await ensureInspectorHousehold(pool);
+  try {
+    const { backfillUploadsFromDisk } = require('./utils/fileStorage');
+    const uploadDirForBackfill = path.isAbsolute(config.upload.dir)
+      ? config.upload.dir
+      : path.join(__dirname, config.upload.dir);
+    await backfillUploadsFromDisk(uploadDirForBackfill);
+  } catch (error) {
+    console.warn('[startup] upload backfill skipped:', error.message);
+  }
 }
 
 let server;

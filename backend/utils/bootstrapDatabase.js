@@ -69,6 +69,7 @@ async function bootstrapDatabase(pool) {
     'scripts/init-db.sql',
     'scripts/ensure-core-schema.sql',
     'scripts/ensure-inspection-schema.sql',
+    'scripts/ensure-file-storage.sql',
     'scripts/migrate-phase1.sql',
     'scripts/migrate-inspector-registration.sql',
     'scripts/migrate-encrypt-personal-data.sql',

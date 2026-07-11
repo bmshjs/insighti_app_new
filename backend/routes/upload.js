@@ -6,6 +6,7 @@ const fs = require('fs');
 const config = require('../config');
 const { authenticateToken } = require('../middleware/auth');
 const fileUploadService = require('../utils/fileUpload');
+const { saveFileToStorage, loadFileFromStorage } = require('../utils/fileStorage');
 
 const router = express.Router();
 
@@ -16,8 +17,8 @@ function getUploadDir() {
   return path.join(__dirname, '..', dir.replace(/^\.\//, ''));
 }
 
-/** GET /api/upload/serve/:filename - 이미지 서빙 (크로스오리진/CORS 대응, 인증 불필요) */
-router.get('/serve/:filename', (req, res) => {
+/** GET /api/upload/serve/:filename - 이미지 서빙 (디스크 없으면 DB 백업) */
+router.get('/serve/:filename', async (req, res) => {
   try {
     let filename = req.params.filename;
     if (!filename) return res.status(400).json({ error: 'Invalid filename' });
@@ -32,6 +33,20 @@ router.get('/serve/:filename', (req, res) => {
       if (fs.existsSync(thumbPath)) {
         filePath = thumbPath;
       } else {
+        const fromDb = await loadFileFromStorage(filename);
+        if (fromDb) {
+          res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          res.setHeader('Content-Type', fromDb.contentType);
+          return res.send(fromDb.buffer);
+        }
+        const thumbDb = await loadFileFromStorage(`thumbs/thumb-${filename}`);
+        if (thumbDb) {
+          res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          res.setHeader('Content-Type', thumbDb.contentType);
+          return res.send(thumbDb.buffer);
+        }
         return res.status(404).json({ error: 'File not found' });
       }
     }
@@ -110,6 +125,10 @@ router.post('/photo', authenticateToken, upload.single('photo'), async (req, res
     // Save files
     await fileUploadService.saveFile(processedBuffer, fileName);
     await fileUploadService.saveThumbnail(thumbnailBuffer, fileName);
+
+    // DB 백업 — 재배포 후에도 사진·보고서에서 사용
+    await saveFileToStorage(fileName, processedBuffer, 'image/jpeg');
+    await saveFileToStorage(`thumbs/thumb-${fileName}`, thumbnailBuffer, 'image/jpeg');
 
     // Return file information
     res.json({
