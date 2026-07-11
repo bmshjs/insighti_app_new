@@ -127,8 +127,15 @@ router.post('/photo', authenticateToken, upload.single('photo'), async (req, res
     await fileUploadService.saveThumbnail(thumbnailBuffer, fileName);
 
     // DB 백업 — 재배포 후에도 사진·보고서에서 사용
-    await saveFileToStorage(fileName, processedBuffer, 'image/jpeg');
-    await saveFileToStorage(`thumbs/thumb-${fileName}`, thumbnailBuffer, 'image/jpeg');
+    const storageBackupMain = await saveFileToStorage(fileName, processedBuffer, 'image/jpeg');
+    const storageBackupThumb = await saveFileToStorage(`thumbs/thumb-${fileName}`, thumbnailBuffer, 'image/jpeg');
+    const storageBackup = storageBackupMain && storageBackupThumb;
+    if (!storageBackup) {
+      console.error('[upload] DB backup failed:', fileName, {
+        main: storageBackupMain,
+        thumb: storageBackupThumb,
+      });
+    }
 
     // Return file information
     res.json({
@@ -137,7 +144,8 @@ router.post('/photo', authenticateToken, upload.single('photo'), async (req, res
       thumbnail_url: fileUploadService.getThumbnailUrl(fileName),
       size: processedBuffer.length,
       original_size: req.file.size,
-      mimetype: 'image/jpeg'
+      mimetype: 'image/jpeg',
+      storage_backup: storageBackup,
     });
 
   } catch (error) {

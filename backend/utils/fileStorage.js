@@ -20,9 +20,57 @@ function extractFilename(fileUrl) {
   return null;
 }
 
+async function ensureFileStorageTable() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS file_storage (
+        filename TEXT PRIMARY KEY,
+        content_type TEXT NOT NULL DEFAULT 'image/jpeg',
+        data BYTEA NOT NULL,
+        size INTEGER,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_file_storage_created_at ON file_storage(created_at)
+    `);
+    return true;
+  } catch (err) {
+    console.error('[fileStorage] ensure table failed:', err.message);
+    return false;
+  }
+}
+
+async function getFileStorageStats() {
+  try {
+    const result = await pool.query(`
+      SELECT COUNT(*)::int AS files, COALESCE(SUM(size), 0)::bigint AS total_bytes
+      FROM file_storage
+    `);
+    return { ok: true, table_exists: true, ...result.rows[0] };
+  } catch (err) {
+    const missing = (err.message || '').includes('file_storage') && (err.message || '').includes('does not exist');
+    return { ok: false, table_exists: !missing, error: err.message };
+  }
+}
+
+async function fileExistsInStorage(filename) {
+  if (!filename) return false;
+  try {
+    const result = await pool.query(
+      'SELECT 1 FROM file_storage WHERE filename = $1 LIMIT 1',
+      [filename]
+    );
+    return result.rows.length > 0;
+  } catch (_) {
+    return false;
+  }
+}
+
 async function saveFileToStorage(filename, buffer, contentType = 'image/jpeg') {
   if (!filename || !buffer || !buffer.length) return false;
   try {
+    await ensureFileStorageTable();
     await pool.query(
       `INSERT INTO file_storage (filename, content_type, data, size)
        VALUES ($1, $2, $3, $4)
@@ -35,10 +83,7 @@ async function saveFileToStorage(filename, buffer, contentType = 'image/jpeg') {
     );
     return true;
   } catch (err) {
-    if ((err.message || '').includes('file_storage') && (err.message || '').includes('does not exist')) {
-      return false;
-    }
-    console.warn('[fileStorage] save failed:', err.message);
+    console.error('[fileStorage] save failed:', filename, err.message);
     return false;
   }
 }
@@ -108,6 +153,9 @@ async function backfillUploadsFromDisk(uploadDir) {
 
 module.exports = {
   extractFilename,
+  ensureFileStorageTable,
+  getFileStorageStats,
+  fileExistsInStorage,
   saveFileToStorage,
   loadFileFromStorage,
   loadFileFromStorageByUrl,

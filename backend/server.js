@@ -146,7 +146,7 @@ app.use('/api/sms', smsRoutes);
 app.use('/api/admin', adminRoutes); // NEW: Admin functions
 
 // Root endpoint (for Render health checks)
-const APP_VERSION = '4.4.11';
+const APP_VERSION = '4.4.12';
 
 app.get('/', (req, res) => {
   res.json({ 
@@ -178,6 +178,8 @@ app.get('/health', async (req, res) => {
           (SELECT COUNT(*)::int FROM defect) AS defects
       `);
       payload.counts = counts.rows[0];
+      const { getFileStorageStats } = require('./utils/fileStorage');
+      payload.file_storage = await getFileStorageStats();
     } catch (error) {
       return res.status(503).json({
         ...payload,
@@ -304,7 +306,12 @@ async function prepareDatabase() {
   }
   await ensureInspectorHousehold(pool);
   try {
-    const { backfillUploadsFromDisk } = require('./utils/fileStorage');
+    const { ensureFileStorageTable, getFileStorageStats, backfillUploadsFromDisk } = require('./utils/fileStorage');
+    await ensureFileStorageTable();
+    const storageStats = await getFileStorageStats();
+    console.log('[startup] file_storage:', storageStats.ok
+      ? `${storageStats.files} file(s), ${storageStats.total_bytes} bytes`
+      : `unavailable (${storageStats.error || 'unknown'})`);
     const uploadDirForBackfill = path.isAbsolute(config.upload.dir)
       ? config.upload.dir
       : path.join(__dirname, config.upload.dir);
