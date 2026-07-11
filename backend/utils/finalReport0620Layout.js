@@ -37,11 +37,19 @@ function dualPhotoSlots(leftX, bottomY) {
   };
 }
 
-/** 육안점검 사진: 1번 0.5cm, 2번 2.3cm 좌측 보정 */
+/** 육안점검 사진: 기준 대비 1번 +1cm, 2번 +4.6cm 우측 (v4.4.14 대비) */
 function visualDualPhotoSlots(leftX, bottomY) {
   return {
-    photoNear: { x: leftX - cmToPt(0.5), y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
-    photoFar: { x: leftX + PHOTO_SLOT_W - cmToPt(2.3), y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+    photoNear: { x: leftX - cmToPt(0.5) + cmToPt(1), y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+    photoFar: { x: leftX + PHOTO_SLOT_W - cmToPt(2.3) + cmToPt(4.6), y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+  };
+}
+
+/** 열화상점검 사진: 2번 +2cm 우측 */
+function thermalDualPhotoSlots(leftX, bottomY) {
+  return {
+    photoNear: { x: leftX, y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+    photoFar: { x: leftX + PHOTO_SLOT_W + cmToPt(2), y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
   };
 }
 
@@ -81,22 +89,22 @@ const THERMAL_BLOCKS = [
   {
     location: { x: 423, y: 914.5 }, locationNo: { x: 447, y: 914.5 }, trade: leftIndentField(84.1, 754.7),
     result: leftIndentField(317, 754.7),
-    ...dualPhotoSlots(THERMAL_PHOTO_LEFT_X, 792),
+    ...thermalDualPhotoSlots(THERMAL_PHOTO_LEFT_X, 792),
   },
   {
     location: { x: 423, y: 694.2 }, locationNo: { x: 447, y: 694.2 }, trade: leftIndentField(84.1, 534.5),
     result: leftIndentField(317, 534.5),
-    ...dualPhotoSlots(THERMAL_PHOTO_LEFT_X, 572),
+    ...thermalDualPhotoSlots(THERMAL_PHOTO_LEFT_X, 572),
   },
   {
     location: { x: 423, y: 474 }, locationNo: { x: 447, y: 474 }, trade: leftIndentField(84.1, 314.2),
     result: leftIndentField(317, 314.2),
-    ...dualPhotoSlots(THERMAL_PHOTO_LEFT_X, 352),
+    ...thermalDualPhotoSlots(THERMAL_PHOTO_LEFT_X, 352),
   },
   {
     location: { x: 423, y: 256.5 }, locationNo: { x: 447, y: 256.5 }, trade: leftIndentField(84.1, 96.8),
     result: leftIndentField(317, 96.8),
-    ...dualPhotoSlots(THERMAL_PHOTO_LEFT_X, 105),
+    ...thermalDualPhotoSlots(THERMAL_PHOTO_LEFT_X, 105),
   },
 ];
 
