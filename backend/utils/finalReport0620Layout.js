@@ -39,49 +39,49 @@ const COVER = {
   nameLine: { x: 18.1, y: 129.1, wipeW: 200, wipeH: 22 },
 };
 
-/** 육안 점검 page 2 — content(하자내용) 329pt 기준, note(특이사항) 라벨열 기준 3cm 들여 좌측정렬 */
+/** 육안 점검 page 2 — content(하자내용)·note(특이사항) 3cm 들여 좌측정렬, trade(공종) 라벨열 기준 3cm 들여 좌측정렬 */
 const VISUAL_BLOCKS = [
   {
-    location: { x: 437.2, y: 927.5 }, trade: { x: 213.6, y: 767.4 },
+    location: { x: 437.2, y: 927.5 }, trade: leftIndentField(95.2, 767.4),
     content: leftIndentField(329, 767.4), note: leftIndentField(83, 739.5),
     ...dualPhotoSlots(VISUAL_PHOTO_LEFT_X, 806),
   },
   {
-    location: { x: 435.7, y: 688.8 }, trade: { x: 212, y: 528.7 },
+    location: { x: 435.7, y: 688.8 }, trade: leftIndentField(93.6, 528.7),
     content: leftIndentField(328, 528.7), note: leftIndentField(82, 500.8),
     ...dualPhotoSlots(VISUAL_PHOTO_LEFT_X, 567),
   },
   {
-    location: { x: 434.1, y: 450.1 }, trade: { x: 210.4, y: 290 },
+    location: { x: 434.1, y: 450.1 }, trade: leftIndentField(92, 290),
     content: leftIndentField(326, 290), note: leftIndentField(80, 262.2),
     ...dualPhotoSlots(VISUAL_PHOTO_LEFT_X, 328),
   },
   {
-    location: { x: 432.5, y: 211.4 }, trade: { x: 208.9, y: 51.3 },
+    location: { x: 432.5, y: 211.4 }, trade: leftIndentField(90.5, 51.3),
     content: leftIndentField(325, 51.3), note: leftIndentField(78, 23.5),
     ...dualPhotoSlots(VISUAL_PHOTO_LEFT_X, 89),
   },
 ];
 
-/** 열화상 page 3 — result(점검내용) 열 시작 후 3cm 들여 좌측정렬 */
+/** 열화상 page 3 — result(점검내용)·trade(공종) 라벨열 기준 3cm 들여 좌측정렬 */
 const THERMAL_BLOCKS = [
   {
-    location: { x: 423, y: 914.5 }, locationNo: { x: 447, y: 914.5 }, trade: { x: 183.2, y: 754.7 },
+    location: { x: 423, y: 914.5 }, locationNo: { x: 447, y: 914.5 }, trade: leftIndentField(84.1, 754.7),
     result: leftIndentField(317, 754.7),
     ...dualPhotoSlots(THERMAL_PHOTO_LEFT_X, 792),
   },
   {
-    location: { x: 423, y: 694.2 }, locationNo: { x: 447, y: 694.2 }, trade: { x: 183.2, y: 534.5 },
+    location: { x: 423, y: 694.2 }, locationNo: { x: 447, y: 694.2 }, trade: leftIndentField(84.1, 534.5),
     result: leftIndentField(317, 534.5),
     ...dualPhotoSlots(THERMAL_PHOTO_LEFT_X, 572),
   },
   {
-    location: { x: 423, y: 474 }, locationNo: { x: 447, y: 474 }, trade: { x: 183.2, y: 314.2 },
+    location: { x: 423, y: 474 }, locationNo: { x: 447, y: 474 }, trade: leftIndentField(84.1, 314.2),
     result: leftIndentField(317, 314.2),
     ...dualPhotoSlots(THERMAL_PHOTO_LEFT_X, 352),
   },
   {
-    location: { x: 423, y: 256.5 }, locationNo: { x: 447, y: 256.5 }, trade: { x: 183.2, y: 96.8 },
+    location: { x: 423, y: 256.5 }, locationNo: { x: 447, y: 256.5 }, trade: leftIndentField(84.1, 96.8),
     result: leftIndentField(317, 96.8),
     ...dualPhotoSlots(THERMAL_PHOTO_LEFT_X, 105),
   },
