@@ -9,7 +9,8 @@ const { loadImageBytes } = require('./photoPath');
 
 const LAYOUT = require('./finalReportLayout');
 
-const TEMPLATE_FILENAME = '종합점검보고서_최종1.pdf';
+const TEMPLATE_FILENAME = '종합점검보고서_0620.pdf';
+const TEMPLATE_FILENAME_LEGACY = '종합점검보고서_최종1.pdf';
 const TEMPLATE_DIR = path.join(__dirname, '..', 'templates');
 const REPORTS_DIR = path.join(__dirname, '..', 'reports');
 const FONTS_DIR = path.join(__dirname, '..', 'fonts');
@@ -1204,7 +1205,23 @@ async function generateFinalReport(reportData, options = {}) {
   const finalFilename = options.filename || `보고서_최종_${dong}-${ho}_${timestamp}.pdf`;
   const finalPath = path.join(REPORTS_DIR, finalFilename);
 
-  const templatePath = path.join(TEMPLATE_DIR, TEMPLATE_FILENAME);
+  const template0620 = path.join(TEMPLATE_DIR, TEMPLATE_FILENAME);
+  if (fs.existsSync(template0620)) {
+    try {
+      const bytes = fs.readFileSync(template0620);
+      const probe = await PDFDocument.load(bytes);
+      if (probe.getPageCount() === 6) {
+        const { generateFinalReport0620 } = require('./finalReportPdf0620Generator');
+        return generateFinalReport0620(reportData, { ...options, filename: finalFilename });
+      }
+    } catch (e) {
+      if (!/encrypted|password/i.test(String(e.message))) throw e;
+    }
+  }
+
+  const templatePath = fs.existsSync(template0620)
+    ? template0620
+    : path.join(TEMPLATE_DIR, TEMPLATE_FILENAME_LEGACY);
   let pdfDoc;
   let usedTemplate = false;
 
