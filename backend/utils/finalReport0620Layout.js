@@ -2,7 +2,7 @@
  * 종합점검보고서_0711.pdf 템플릿 필드 좌표 (A4 794×1123pt)
  * y: PDF 좌하단 원점 기준 (사각형 bottom-left)
  *
- * 사진: 육안·열화상만. 전체 24.4×6.7cm 영역을 좌/우 2칸(각 12.2×3.3cm)으로 사용.
+ * 사진: 육안·열화상만. 좌/우 2칸(각 10×3.3cm), 시작 x좌표는 열화상 기준으로 통일.
  */
 const PAGE_WIDTH = 794;
 const PAGE_HEIGHT = 1123;
@@ -15,14 +15,15 @@ const INDENT_3CM = Math.round(3 * CM_TO_PT * 10) / 10; // 85.0
 function leftIndentField(colLeft, y) {
   return { x: colLeft + INDENT_3CM, y, align: 'left' };
 }
-/** 슬롯 1개: 12.2cm × 3.3cm */
-const PHOTO_SLOT_W = Math.round(12.2 * CM_TO_PT * 10) / 10; // 346.1
+/** 슬롯 1개: 10cm × 3.3cm */
+const PHOTO_SLOT_W = Math.round(10 * CM_TO_PT * 10) / 10; // 283.5
 const PHOTO_SLOT_H = Math.round(3.3 * CM_TO_PT * 10) / 10; // 93.5
-/** 전체 사진 영역: 24.4cm × 6.7cm */
-const PHOTO_AREA_W = Math.round(24.4 * CM_TO_PT * 10) / 10; // 692.2
+/** 전체 사진 영역: 20cm × 6.7cm */
+const PHOTO_AREA_W = PHOTO_SLOT_W * 2; // 567
 const PHOTO_AREA_H = Math.round(6.7 * CM_TO_PT * 10) / 10; // 189.9
 
-const VISUAL_PHOTO_LEFT_X = 180.5;
+// 육안·열화상 사진 시작 x좌표 동일 (열화상 기준)
+const VISUAL_PHOTO_LEFT_X = 64.2;
 const THERMAL_PHOTO_LEFT_X = 64.2;
 
 function dualPhotoSlots(leftX, bottomY) {
