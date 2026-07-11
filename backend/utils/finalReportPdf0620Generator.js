@@ -1,5 +1,5 @@
 /**
- * 최종보고서 PDF 생성 — 종합점검보고서_0620.pdf 템플릿 기반
+ * 최종보고서 PDF 생성 — 종합점검보고서_0711.pdf 템플릿 기반
  * 템플릿 페이지 위에 샘플 텍스트를 덮고 실제 데이터·사진을 오버레이
  */
 const fs = require('fs');
@@ -15,7 +15,7 @@ const { loadImageBytes } = require('./photoPath');
 const TEMPLATE_DIR = path.join(__dirname, '..', 'templates');
 const REPORTS_DIR = path.join(__dirname, '..', 'reports');
 const FONTS_DIR = path.join(__dirname, '..', 'fonts');
-const TEMPLATE_FILENAME = '종합점검보고서_0620.pdf';
+const TEMPLATE_FILENAME = '종합점검보고서_0711.pdf';
 
 function safe(v) {
   if (v == null || v === '') return '-';
@@ -255,9 +255,9 @@ async function fillLevelPage(pdfDoc, page, font, items) {
 }
 
 async function generateFinalReport0620(reportData, options = {}) {
-  const templatePath = path.join(TEMPLATE_DIR, TEMPLATE_FILENAME);
+  const templatePath = options.templatePath || path.join(TEMPLATE_DIR, TEMPLATE_FILENAME);
   if (!fs.existsSync(templatePath)) {
-    throw new Error(`PDF 템플릿을 찾을 수 없습니다: ${TEMPLATE_FILENAME}`);
+    throw new Error(`PDF 템플릿을 찾을 수 없습니다: ${path.basename(templatePath)}`);
   }
 
   const dong = reportData.dong || '';

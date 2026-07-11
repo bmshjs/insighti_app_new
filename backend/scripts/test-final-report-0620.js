@@ -1,5 +1,5 @@
 /**
- * 종합점검보고서_0620.pdf 템플릿 생성 테스트
+ * 종합점검보고서_0711.pdf 템플릿 생성 테스트
  */
 const path = require('path');
 const { generateFinalReport0620 } = require('../utils/finalReportPdf0620Generator');
@@ -49,7 +49,7 @@ const sample = {
 };
 
 (async () => {
-  const out = await generateFinalReport0620(sample, { filename: '_test_0620_report.pdf' });
+  const out = await generateFinalReport0620(sample, { filename: '_test_0711_report.pdf' });
   console.log('OK', out.path, out.size);
 })().catch((e) => {
   console.error(e);
