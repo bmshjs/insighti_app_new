@@ -40,6 +40,16 @@ function getVisualItems(reportData) {
   return getVisualPageItems(reportData).filter((x) => !x._sectionHeader);
 }
 
+function chunkItems(items, perPage = LAYOUT.BLOCKS_PER_PAGE) {
+  const list = items || [];
+  if (!list.length) return [[]];
+  const chunks = [];
+  for (let i = 0; i < list.length; i += perPage) {
+    chunks.push(list.slice(i, i + perPage));
+  }
+  return chunks;
+}
+
 function getAirRows(reportData) {
   const airList = reportData.air_measurements || [];
   const radonList = reportData.radon_measurements || [];
@@ -289,7 +299,8 @@ async function generateFinalReport0620(reportData, options = {}) {
   if (!fs.existsSync(REPORTS_DIR)) fs.mkdirSync(REPORTS_DIR, { recursive: true });
 
   const templateBytes = fs.readFileSync(templatePath);
-  const pdfDoc = await PDFDocument.load(templateBytes);
+  const templateDoc = await PDFDocument.load(templateBytes);
+  const pdfDoc = await PDFDocument.create();
   const fonts = await embedCustomFonts(pdfDoc);
   const font = fonts.regular;
 
@@ -298,25 +309,44 @@ async function generateFinalReport0620(reportData, options = {}) {
   const airRows = getAirRows(reportData);
   const levelItems = reportData.level_measurements || [];
 
-  if (visualItems.length > LAYOUT.BLOCKS_PER_PAGE) {
-    console.warn(`[final-report-0620] 육안 ${visualItems.length}건 — 페이지당 최대 ${LAYOUT.BLOCKS_PER_PAGE}건만 표시`);
-  }
-
-  const pages = pdfDoc.getPages();
+  const visualChunks = chunkItems(visualItems);
+  const thermalChunks = chunkItems(thermalItems);
   const idx = LAYOUT.PAGE_INDEX;
 
-  if (pages[idx.cover]) fillCover(pages[idx.cover], fonts.bold, reportData);
-  if (pages[idx.visual]) await fillVisualPage(pdfDoc, pages[idx.visual], font, visualItems);
-  if (pages[idx.thermal]) await fillThermalPage(pdfDoc, pages[idx.thermal], font, thermalItems);
-  if (pages[idx.air]) await fillAirPage(pdfDoc, pages[idx.air], font, airRows);
-  if (pages[idx.level]) await fillLevelPage(pdfDoc, pages[idx.level], font, levelItems);
+  const [coverTpl, , , airTpl, levelTpl, contactTpl] = await pdfDoc.copyPages(
+    templateDoc,
+    [idx.cover, idx.visual, idx.thermal, idx.air, idx.level, idx.contact]
+  );
+
+  pdfDoc.addPage(coverTpl);
+  fillCover(coverTpl, fonts.bold, reportData);
+
+  for (const chunk of visualChunks) {
+    const [page] = await pdfDoc.copyPages(templateDoc, [idx.visual]);
+    pdfDoc.addPage(page);
+    await fillVisualPage(pdfDoc, page, font, chunk);
+  }
+
+  for (const chunk of thermalChunks) {
+    const [page] = await pdfDoc.copyPages(templateDoc, [idx.thermal]);
+    pdfDoc.addPage(page);
+    await fillThermalPage(pdfDoc, page, font, chunk);
+  }
+
+  pdfDoc.addPage(airTpl);
+  await fillAirPage(pdfDoc, airTpl, font, airRows);
+
+  pdfDoc.addPage(levelTpl);
+  await fillLevelPage(pdfDoc, levelTpl, font, levelItems);
+
+  pdfDoc.addPage(contactTpl);
 
   const bytes = await pdfDoc.save();
   fs.writeFileSync(outputPath, bytes);
   const size = fs.statSync(outputPath).size;
 
   console.log(
-    `[final-report-0620] household=${dong}-${ho} visual=${visualItems.length} thermal=${thermalItems.length} air=${airRows.length} level=${levelItems.length}`
+    `[final-report-0620] household=${dong}-${ho} visual=${visualItems.length}(${visualChunks.length}p) thermal=${thermalItems.length}(${thermalChunks.length}p) air=${airRows.length} level=${levelItems.length} pages=${pdfDoc.getPageCount()}`
   );
 
   return { filename, path: outputPath, url: `/reports/${filename}`, size };
