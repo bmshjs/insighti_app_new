@@ -14,6 +14,15 @@ const UPLOADS_DIR = path.isAbsolute(config.upload.dir)
 
 const PUBLIC_BASE_URL = (process.env.BACKEND_URL || process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
 
+function getPublicBaseUrls() {
+  const urls = [];
+  if (PUBLIC_BASE_URL) urls.push(PUBLIC_BASE_URL);
+  urls.push('https://insighti-app-new.onrender.com');
+  const port = process.env.PORT || 3000;
+  urls.push(`http://127.0.0.1:${port}`);
+  return [...new Set(urls.filter(Boolean))];
+}
+
 function extractUploadSubpath(fileUrl) {
   if (!fileUrl || typeof fileUrl !== 'string') return null;
   let rel = String(fileUrl).trim();
@@ -56,12 +65,32 @@ function resolvePhotoHttpUrl(fileUrl) {
   if (!fileUrl || typeof fileUrl !== 'string') return null;
   const u = String(fileUrl).trim();
   if (/^https?:\/\//i.test(u)) return u;
-  if (!PUBLIC_BASE_URL) return null;
   const sub = extractUploadSubpath(u);
-  if (sub && !u.includes('/api/upload/serve/')) {
-    return `${PUBLIC_BASE_URL}/api/upload/serve/${encodeURIComponent(path.basename(sub))}`;
+  const bases = getPublicBaseUrls();
+  for (const base of bases) {
+    if (sub && !u.includes('/api/upload/serve/')) {
+      return `${base}/api/upload/serve/${encodeURIComponent(path.basename(sub))}`;
+    }
+    if (u.startsWith('/')) return `${base}${u}`;
+    if (u) return `${base}/${u}`;
   }
-  return u.startsWith('/') ? `${PUBLIC_BASE_URL}${u}` : `${PUBLIC_BASE_URL}/${u}`;
+  return null;
+}
+
+function resolvePhotoHttpUrls(fileUrl) {
+  const primary = resolvePhotoHttpUrl(fileUrl);
+  const urls = [];
+  if (primary) urls.push(primary);
+  const sub = extractUploadSubpath(fileUrl);
+  if (sub) {
+    for (const base of getPublicBaseUrls()) {
+      urls.push(`${base}/api/upload/serve/${encodeURIComponent(path.basename(sub))}`);
+    }
+  }
+  if (/^https?:\/\//i.test(String(fileUrl || '').trim())) {
+    urls.push(String(fileUrl).trim());
+  }
+  return [...new Set(urls)];
 }
 
 function fetchUrlBuffer(url, redirects = 0) {
@@ -101,8 +130,8 @@ async function loadImageBytes(fileUrl) {
     return fromDb.buffer;
   }
 
-  const httpUrl = resolvePhotoHttpUrl(fileUrl);
-  if (httpUrl) {
+  const httpUrls = resolvePhotoHttpUrls(fileUrl);
+  for (const httpUrl of httpUrls) {
     const remote = await fetchUrlBuffer(httpUrl);
     if (remote && remote.length > 100) return remote;
   }
@@ -113,6 +142,7 @@ module.exports = {
   getPhotoPath,
   loadImageBytes,
   resolvePhotoHttpUrl,
+  resolvePhotoHttpUrls,
   extractUploadSubpath,
   UPLOADS_DIR,
   PUBLIC_BASE_URL,

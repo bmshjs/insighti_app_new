@@ -6,6 +6,7 @@ const path = require('path');
 const https = require('https');
 
 const FONTS_DIR = path.join(__dirname, '..', 'fonts');
+const OUT_MALGUN = path.join(FONTS_DIR, 'malgun.ttf');
 const OUT_OTF = path.join(FONTS_DIR, 'NotoSansCJKkr-Regular.otf');
 const OUT_TTF = path.join(FONTS_DIR, 'NotoSansKR-Regular.ttf');
 
@@ -48,7 +49,7 @@ function download(url, dest, redirects = 0) {
 async function main() {
   if (!fs.existsSync(FONTS_DIR)) fs.mkdirSync(FONTS_DIR, { recursive: true });
 
-  const existing = [OUT_OTF, OUT_TTF].find((p) => fs.existsSync(p) && fs.statSync(p).size > 50000);
+  const existing = [OUT_MALGUN, OUT_OTF, OUT_TTF].find((p) => fs.existsSync(p) && fs.statSync(p).size > 50000);
   if (existing) {
     console.log(`Korean font OK: ${existing} (${fs.statSync(existing).size} bytes)`);
     return;

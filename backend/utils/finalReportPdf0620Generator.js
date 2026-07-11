@@ -53,6 +53,9 @@ function getAirRows(reportData) {
 
 function resolveKoreanFontPath() {
   const candidates = [
+    path.join(FONTS_DIR, 'malgun.ttf'),
+    path.join(FONTS_DIR, 'Malgun.ttf'),
+    path.join(FONTS_DIR, 'malgunbd.ttf'),
     path.join(FONTS_DIR, 'NotoSansKR-Regular.ttf'),
     path.join(FONTS_DIR, 'NotoSansCJKkr-Regular.otf'),
     path.join(__dirname, '..', 'node_modules', '@fontsource', 'noto-sans-kr', 'files', 'noto-sans-kr-korean-400-normal.woff2'),
@@ -61,7 +64,7 @@ function resolveKoreanFontPath() {
     if (fs.existsSync(p) && fs.statSync(p).size > 10000) return p;
   }
   if (fs.existsSync(FONTS_DIR)) {
-    const found = fs.readdirSync(FONTS_DIR).find((f) => /\.(ttf|otf|woff2)$/i.test(f));
+    const found = fs.readdirSync(FONTS_DIR).find((f) => /malgun|noto.*kr/i.test(f) && /\.(ttf|otf|woff2)$/i.test(f));
     if (found) return path.join(FONTS_DIR, found);
   }
   return null;
@@ -82,27 +85,45 @@ async function embedCustomFont(pdfDoc) {
   return pdfDoc.embedFont(StandardFonts.Helvetica);
 }
 
+const TEXT_COLOR = () => {
+  const c = LAYOUT.FIELD.textColor;
+  return rgb(c.r, c.g, c.b);
+};
+
+function getPhotoUrl(photo) {
+  if (!photo) return null;
+  return photo.file_url || photo.url || photo.thumb_url || null;
+}
+
+function collectPhotoUrls(item) {
+  const photos = normalizePhotoList(item?.photos || []);
+  return photos.map(getPhotoUrl).filter(Boolean);
+}
+
 function wipeAndText(page, font, pos, text, size = LAYOUT.FIELD.fontSize) {
   if (!pos) return;
   const pad = LAYOUT.FIELD.wipePad;
   const c = LAYOUT.FIELD.wipeColor;
-  const w = pos.w || 80;
-  const h = pos.h || 16;
+  const w = pos.w || 100;
+  const h = pos.h || 18;
   page.drawRectangle({
     x: pos.x - pad,
-    y: pos.y - pad,
+    y: pos.y - 6,
     width: w + pad * 2,
     height: h + pad * 2,
     color: rgb(c.r, c.g, c.b),
   });
-  page.drawText(safe(text), { x: pos.x, y: pos.y, size, font, color: rgb(0, 0, 0) });
+  page.drawText(safe(text), { x: pos.x, y: pos.y, size, font, color: TEXT_COLOR() });
 }
 
 async function embedAndDrawPhoto(pdfDoc, page, fileUrl, rect) {
-  if (!rect || !fileUrl) return;
+  if (!rect || !fileUrl) return false;
   try {
     const buf = await loadImageBytes(fileUrl);
-    if (!buf || buf.length < 10) return;
+    if (!buf || buf.length < 10) {
+      console.warn('[final-report-0620] photo load empty:', fileUrl);
+      return false;
+    }
     const isPng = buf[0] === 0x89 && buf[1] === 0x50;
     const isJpg = buf[0] === 0xff && buf[1] === 0xd8;
     let image;
@@ -116,7 +137,7 @@ async function embedAndDrawPhoto(pdfDoc, page, fileUrl, rect) {
       }
     }
     const dims = image.scale(1);
-    const scale = Math.min(rect.w / dims.width, rect.h / dims.height, 1);
+    const scale = Math.min(rect.w / dims.width, rect.h / dims.height);
     const drawW = dims.width * scale;
     const drawH = dims.height * scale;
     const dx = rect.x + (rect.w - drawW) / 2;
@@ -129,8 +150,29 @@ async function embedAndDrawPhoto(pdfDoc, page, fileUrl, rect) {
       color: rgb(1, 1, 1),
     });
     page.drawImage(image, { x: dx, y: dy, width: drawW, height: drawH });
-  } catch (_) {
-    // ignore
+    return true;
+  } catch (e) {
+    console.warn('[final-report-0620] photo embed failed:', fileUrl, e.message);
+    return false;
+  }
+}
+
+async function drawBlockPhotos(pdfDoc, page, photoUrls, rect, maxPhotos = 2) {
+  const urls = (photoUrls || []).filter(Boolean).slice(0, maxPhotos);
+  if (!urls.length || !rect) return;
+  if (urls.length === 1) {
+    await embedAndDrawPhoto(pdfDoc, page, urls[0], rect);
+    return;
+  }
+  const gap = 4;
+  const slotW = (rect.w - gap) / urls.length;
+  for (let i = 0; i < urls.length; i++) {
+    await embedAndDrawPhoto(pdfDoc, page, urls[i], {
+      x: rect.x + i * (slotW + gap),
+      y: rect.y,
+      w: slotW,
+      h: rect.h,
+    });
   }
 }
 
@@ -138,16 +180,16 @@ function wipeCoverLine(page, font, lineDef, text) {
   if (!lineDef) return;
   const pad = LAYOUT.FIELD.wipePad;
   const c = LAYOUT.FIELD.wipeColor;
-  const size = lineDef.size || LAYOUT.FIELD.fontSize;
+  const size = LAYOUT.FIELD.fontSize;
   const wipeH = lineDef.wipeH || 22;
   page.drawRectangle({
     x: lineDef.x - pad,
-    y: lineDef.y - 5,
+    y: lineDef.y - 6,
     width: lineDef.wipeW + pad * 2,
     height: wipeH + pad * 2,
     color: rgb(c.r, c.g, c.b),
   });
-  page.drawText(safe(text), { x: lineDef.x, y: lineDef.y, size, font, color: rgb(0, 0, 0) });
+  page.drawText(safe(text), { x: lineDef.x, y: lineDef.y, size, font, color: TEXT_COLOR() });
 }
 
 function fillCover(page, font, data) {
@@ -171,16 +213,11 @@ async function fillVisualPage(pdfDoc, page, font, items) {
     const item = list[i];
     const b = blocks[i];
     if (!b) continue;
-    wipeAndText(page, font, { ...b.location, w: 60, h: 14 }, item?.location);
-    wipeAndText(page, font, { ...b.trade, w: 60, h: 14 }, item?.trade);
-    wipeAndText(page, font, { ...b.content, w: 80, h: 14 }, item?.note ?? item?.content);
-    wipeAndText(page, font, { ...b.note, w: 80, h: 14 }, item?.result_text ?? item?.result ?? item?.memo);
-
-    const photos = normalizePhotoList(item?.photos || []);
-    const url0 = photos[0] && (photos[0].file_url || photos[0].url);
-    const url1 = photos[1] && (photos[1].file_url || photos[1].url);
-    if (url0) await embedAndDrawPhoto(pdfDoc, page, url0, b.photoNear);
-    if (url1) await embedAndDrawPhoto(pdfDoc, page, url1, b.photoFar);
+    wipeAndText(page, font, { ...b.location, w: 80, h: 18 }, item?.location);
+    wipeAndText(page, font, { ...b.trade, w: 80, h: 18 }, item?.trade);
+    wipeAndText(page, font, { ...b.content, w: 100, h: 18 }, item?.note ?? item?.content);
+    wipeAndText(page, font, { ...b.note, w: 100, h: 18 }, item?.result_text ?? item?.result ?? item?.memo);
+    await drawBlockPhotos(pdfDoc, page, collectPhotoUrls(item), b.photo, 2);
   }
 }
 
@@ -195,16 +232,11 @@ async function fillThermalPage(pdfDoc, page, font, items) {
     if (!b) continue;
     const loc = splitLocation(item?.location);
     const trade = splitTrade(item?.trade);
-    wipeAndText(page, font, { ...b.location, w: 50, h: 14 }, loc.main);
-    if (b.locationNo && loc.sub) wipeAndText(page, font, { ...b.locationNo, w: 20, h: 14 }, loc.sub);
-    wipeAndText(page, font, { ...b.trade, w: 90, h: 14 }, `${trade.main}${trade.sub}`);
-    wipeAndText(page, font, { ...b.result, w: 80, h: 14 }, item?.result_text ?? item?.result ?? item?.note);
-
-    const photos = normalizePhotoList(item?.photos || []);
-    const url0 = photos[0] && (photos[0].file_url || photos[0].url);
-    const url1 = photos[1] && (photos[1].file_url || photos[1].url);
-    if (url0) await embedAndDrawPhoto(pdfDoc, page, url0, b.photoNear);
-    if (url1) await embedAndDrawPhoto(pdfDoc, page, url1, b.photoFar);
+    wipeAndText(page, font, { ...b.location, w: 60, h: 18 }, loc.main);
+    if (b.locationNo && loc.sub) wipeAndText(page, font, { ...b.locationNo, w: 24, h: 18 }, loc.sub);
+    wipeAndText(page, font, { ...b.trade, w: 100, h: 18 }, `${trade.main}${trade.sub}`);
+    wipeAndText(page, font, { ...b.result, w: 100, h: 18 }, item?.result_text ?? item?.result ?? item?.note);
+    await drawBlockPhotos(pdfDoc, page, collectPhotoUrls(item), b.photo, 2);
   }
 }
 
@@ -218,24 +250,22 @@ async function fillAirPage(pdfDoc, page, font, rows) {
     const b = blocks[i];
     if (!b) continue;
     const loc = splitLocation(row.air?.location || row.radon?.location);
-    wipeAndText(page, font, { ...b.location, w: 50, h: 14 }, loc.main);
-    if (b.locationNo && loc.sub) wipeAndText(page, font, { ...b.locationNo, w: 20, h: 14 }, loc.sub);
+    wipeAndText(page, font, { ...b.location, w: 60, h: 18 }, loc.main);
+    if (b.locationNo && loc.sub) wipeAndText(page, font, { ...b.locationNo, w: 24, h: 18 }, loc.sub);
     wipeAndText(
       page,
       font,
-      { ...b.result, w: 50, h: 14 },
+      { ...b.result, w: 60, h: 18 },
       row.air?.result_text ?? row.air?.result ?? row.radon?.result_text ?? row.radon?.result
     );
-    wipeAndText(page, font, { ...b.tvoc, w: 50, h: 14 }, row.air?.tvoc != null ? String(row.air.tvoc) : '-');
-    wipeAndText(page, font, { ...b.hcho, w: 50, h: 14 }, row.air?.hcho != null ? String(row.air.hcho) : '-');
-    wipeAndText(page, font, { ...b.radon, w: 40, h: 14 }, row.radon?.radon != null ? String(row.radon.radon) : '-');
-
-    const photos = [
-      ...normalizePhotoList(row.air?.photos || []),
-      ...normalizePhotoList(row.radon?.photos || []),
+    wipeAndText(page, font, { ...b.tvoc, w: 60, h: 18 }, row.air?.tvoc != null ? String(row.air.tvoc) : '-');
+    wipeAndText(page, font, { ...b.hcho, w: 60, h: 18 }, row.air?.hcho != null ? String(row.air.hcho) : '-');
+    wipeAndText(page, font, { ...b.radon, w: 50, h: 18 }, row.radon?.radon != null ? String(row.radon.radon) : '-');
+    const airPhotos = [
+      ...collectPhotoUrls(row.air),
+      ...collectPhotoUrls(row.radon),
     ];
-    const url = photos[0] && (photos[0].file_url || photos[0].url);
-    if (url) await embedAndDrawPhoto(pdfDoc, page, url, b.photo);
+    await drawBlockPhotos(pdfDoc, page, airPhotos, b.photo, 1);
   }
 }
 
@@ -249,16 +279,13 @@ async function fillLevelPage(pdfDoc, page, font, items) {
     const b = blocks[i];
     if (!b) continue;
     const loc = splitLocation(item?.location);
-    wipeAndText(page, font, { ...b.location, w: 50, h: 14 }, loc.main);
-    wipeAndText(page, font, { ...b.result, w: 50, h: 14 }, item?.result_text ?? item?.result);
-    wipeAndText(page, font, { ...b.p1, w: 30, h: 14 }, item?.point1_left_mm ?? item?.left_mm);
-    wipeAndText(page, font, { ...b.p2, w: 30, h: 14 }, item?.point2_left_mm);
-    wipeAndText(page, font, { ...b.p3, w: 30, h: 14 }, item?.point3_left_mm);
-    wipeAndText(page, font, { ...b.p4, w: 30, h: 14 }, item?.point4_left_mm);
-
-    const photos = normalizePhotoList(item?.photos || []);
-    const url = photos[0] && (photos[0].file_url || photos[0].url);
-    if (url) await embedAndDrawPhoto(pdfDoc, page, url, b.photo);
+    wipeAndText(page, font, { ...b.location, w: 60, h: 18 }, loc.main);
+    wipeAndText(page, font, { ...b.result, w: 60, h: 18 }, item?.result_text ?? item?.result);
+    wipeAndText(page, font, { ...b.p1, w: 36, h: 18 }, item?.point1_left_mm ?? item?.left_mm);
+    wipeAndText(page, font, { ...b.p2, w: 36, h: 18 }, item?.point2_left_mm);
+    wipeAndText(page, font, { ...b.p3, w: 36, h: 18 }, item?.point3_left_mm);
+    wipeAndText(page, font, { ...b.p4, w: 36, h: 18 }, item?.point4_left_mm);
+    await drawBlockPhotos(pdfDoc, page, collectPhotoUrls(item), b.photo, 1);
   }
 }
 
