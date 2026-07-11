@@ -33,67 +33,68 @@ const COVER = {
   nameLine: { x: 18.1, y: 129.1, wipeW: 200, wipeH: 22 },
 };
 
-/** 육안 점검 page 2 */
+/** 육안 점검 page 2 — content(하자내용) 좌측정렬 */
 const VISUAL_BLOCKS = [
   {
-    location: { x: 437.2, y: 927.5 }, trade: { x: 213.6, y: 767.4 }, content: { x: 553, y: 767.4 }, note: { x: 425.3, y: 739.5 },
+    location: { x: 437.2, y: 927.5 }, trade: { x: 213.6, y: 767.4 }, content: { x: 329, y: 767.4, align: 'left' }, note: { x: 425.3, y: 739.5 },
     ...dualPhotoSlots(VISUAL_PHOTO_LEFT_X, 806),
   },
   {
-    location: { x: 435.7, y: 688.8 }, trade: { x: 212, y: 528.7 }, content: { x: 551.4, y: 528.7 }, note: { x: 423.7, y: 500.8 },
+    location: { x: 435.7, y: 688.8 }, trade: { x: 212, y: 528.7 }, content: { x: 328, y: 528.7, align: 'left' }, note: { x: 423.7, y: 500.8 },
     ...dualPhotoSlots(VISUAL_PHOTO_LEFT_X, 567),
   },
   {
-    location: { x: 434.1, y: 450.1 }, trade: { x: 210.4, y: 290 }, content: { x: 549.8, y: 290 }, note: { x: 422.1, y: 262.2 },
+    location: { x: 434.1, y: 450.1 }, trade: { x: 210.4, y: 290 }, content: { x: 326, y: 290, align: 'left' }, note: { x: 422.1, y: 262.2 },
     ...dualPhotoSlots(VISUAL_PHOTO_LEFT_X, 328),
   },
   {
-    location: { x: 432.5, y: 211.4 }, trade: { x: 208.9, y: 51.3 }, content: { x: 548.3, y: 51.3 }, note: { x: 420.6, y: 23.5 },
+    location: { x: 432.5, y: 211.4 }, trade: { x: 208.9, y: 51.3 }, content: { x: 325, y: 51.3, align: 'left' }, note: { x: 420.6, y: 23.5 },
     ...dualPhotoSlots(VISUAL_PHOTO_LEFT_X, 89),
   },
 ];
 
-/** 열화상 page 3 */
+/** 열화상 page 3 — result(점검내용) 좌측정렬 */
 const THERMAL_BLOCKS = [
   {
-    location: { x: 423, y: 914.5 }, locationNo: { x: 447, y: 914.5 }, trade: { x: 183.2, y: 754.7 }, result: { x: 541.9, y: 754.7 },
+    location: { x: 423, y: 914.5 }, locationNo: { x: 447, y: 914.5 }, trade: { x: 183.2, y: 754.7 }, result: { x: 317, y: 754.7, align: 'left' },
     ...dualPhotoSlots(THERMAL_PHOTO_LEFT_X, 792),
   },
   {
-    location: { x: 423, y: 694.2 }, locationNo: { x: 447, y: 694.2 }, trade: { x: 183.2, y: 534.5 }, result: { x: 541.9, y: 534.5 },
+    location: { x: 423, y: 694.2 }, locationNo: { x: 447, y: 694.2 }, trade: { x: 183.2, y: 534.5 }, result: { x: 317, y: 534.5, align: 'left' },
     ...dualPhotoSlots(THERMAL_PHOTO_LEFT_X, 572),
   },
   {
-    location: { x: 423, y: 474 }, locationNo: { x: 447, y: 474 }, trade: { x: 183.2, y: 314.2 }, result: { x: 541.9, y: 314.2 },
+    location: { x: 423, y: 474 }, locationNo: { x: 447, y: 474 }, trade: { x: 183.2, y: 314.2 }, result: { x: 317, y: 314.2, align: 'left' },
     ...dualPhotoSlots(THERMAL_PHOTO_LEFT_X, 352),
   },
   {
-    location: { x: 423, y: 256.5 }, locationNo: { x: 447, y: 256.5 }, trade: { x: 183.2, y: 96.8 }, result: { x: 541.9, y: 96.8 },
+    location: { x: 423, y: 256.5 }, locationNo: { x: 447, y: 256.5 }, trade: { x: 183.2, y: 96.8 }, result: { x: 317, y: 96.8, align: 'left' },
     ...dualPhotoSlots(THERMAL_PHOTO_LEFT_X, 105),
   },
 ];
 
-/** 공기질 page 4 — 사진 없음 */
+/** 공기질 page 4 — radon 중앙정렬 */
+const RADON_CELL = { x: 535, w: 73, align: 'center' };
 const AIR_BLOCKS = [
   {
     location: { x: 141.3, y: 873.4 }, locationNo: { x: 165, y: 873.4 }, result: { x: 141.3, y: 843.6 },
-    tvoc: { x: 539.8, y: 865.4 }, hcho: { x: 539.8, y: 829.9 }, radon: { x: 549.1, y: 794.5 },
+    tvoc: { x: 539.8, y: 865.4 }, hcho: { x: 539.8, y: 829.9 }, radon: { ...RADON_CELL, y: 794.5 },
   },
   {
     location: { x: 140.4, y: 713.1 }, locationNo: { x: 164, y: 713.1 }, result: { x: 140.4, y: 683.6 },
-    tvoc: { x: 539, y: 705 }, hcho: { x: 539, y: 669.5 }, radon: { x: 548.2, y: 634.1 },
+    tvoc: { x: 539, y: 705 }, hcho: { x: 539, y: 669.5 }, radon: { ...RADON_CELL, y: 634.1 },
   },
   {
     location: { x: 139.6, y: 556.1 }, locationNo: { x: 163, y: 556.1 }, result: { x: 139.6, y: 526.7 },
-    tvoc: { x: 538.1, y: 544.6 }, hcho: { x: 538.1, y: 509.2 }, radon: { x: 547.4, y: 473.7 },
+    tvoc: { x: 538.1, y: 544.6 }, hcho: { x: 538.1, y: 509.2 }, radon: { ...RADON_CELL, y: 473.7 },
   },
   {
     location: { x: 138.7, y: 392.2 }, locationNo: { x: 162, y: 392.2 }, result: { x: 138.7, y: 362.7 },
-    tvoc: { x: 537.3, y: 383.1 }, hcho: { x: 537.3, y: 347.6 }, radon: { x: 546.5, y: 312.2 },
+    tvoc: { x: 537.3, y: 383.1 }, hcho: { x: 537.3, y: 347.6 }, radon: { ...RADON_CELL, y: 312.2 },
   },
   {
     location: { x: 137.9, y: 228.2 }, locationNo: { x: 161, y: 228.2 }, result: { x: 137.9, y: 198.8 },
-    tvoc: { x: 536.4, y: 219.3 }, hcho: { x: 536.4, y: 183.8 }, radon: { x: 545.6, y: 148.4 },
+    tvoc: { x: 536.4, y: 219.3 }, hcho: { x: 536.4, y: 183.8 }, radon: { ...RADON_CELL, y: 148.4 },
   },
 ];
 

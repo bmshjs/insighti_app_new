@@ -70,19 +70,36 @@ function resolveKoreanFontPath() {
   return null;
 }
 
-async function embedCustomFont(pdfDoc) {
+function resolveKoreanBoldFontPath() {
+  const candidates = [
+    path.join(FONTS_DIR, 'malgunbd.ttf'),
+    path.join(FONTS_DIR, 'Malgunbd.ttf'),
+    path.join(FONTS_DIR, 'NotoSansKR-Bold.ttf'),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p) && fs.statSync(p).size > 10000) return p;
+  }
+  return null;
+}
+
+async function embedCustomFonts(pdfDoc) {
   try {
     const fontkit = require('@pdf-lib/fontkit');
     pdfDoc.registerFontkit(fontkit);
-    const fontPath = resolveKoreanFontPath();
-    if (fontPath) {
-      return await pdfDoc.embedFont(fs.readFileSync(fontPath));
-    }
-    console.warn('[final-report-0620] Korean font not found');
+    const regularPath = resolveKoreanFontPath();
+    const boldPath = resolveKoreanBoldFontPath();
+    const regular = regularPath
+      ? await pdfDoc.embedFont(fs.readFileSync(regularPath))
+      : await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const bold = boldPath
+      ? await pdfDoc.embedFont(fs.readFileSync(boldPath))
+      : regular;
+    return { regular, bold };
   } catch (e) {
     console.warn('[final-report-0620] font embed failed:', e.message);
+    const fallback = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    return { regular: fallback, bold: fallback };
   }
-  return pdfDoc.embedFont(StandardFonts.Helvetica);
 }
 
 const TEXT_COLOR = () => {
@@ -100,10 +117,18 @@ function collectPhotoUrls(item) {
   return photos.map(getPhotoUrl).filter(Boolean);
 }
 
-/** 데이터 필드: 강조색(흰색 덮기) 없이 검정 텍스트만 출력 */
+/** 데이터 필드: align(left|center|right), pos.w 로 정렬 영역 지정 */
 function drawDataText(page, font, pos, text, size = LAYOUT.FIELD.fontSize) {
   if (!pos) return;
-  page.drawText(safe(text), { x: pos.x, y: pos.y, size, font, color: TEXT_COLOR() });
+  const s = safe(text);
+  let x = pos.x;
+  const textW = font.widthOfTextAtSize(s, size);
+  if (pos.align === 'center' && pos.w) {
+    x = pos.x + (pos.w - textW) / 2;
+  } else if (pos.align === 'right' && pos.w) {
+    x = pos.x + pos.w - textW;
+  }
+  page.drawText(s, { x, y: pos.y, size, font, color: TEXT_COLOR() });
 }
 
 async function embedAndDrawPhoto(pdfDoc, page, fileUrl, rect) {
@@ -157,22 +182,17 @@ async function drawBlockPhotos(pdfDoc, page, photoUrls, block) {
   }
 }
 
-function drawCoverLine(page, font, lineDef, text) {
-  if (!lineDef) return;
-  const size = LAYOUT.FIELD.fontSize;
-  page.drawText(safe(text), { x: lineDef.x, y: lineDef.y, size, font, color: TEXT_COLOR() });
-}
-
-function fillCover(page, font, data) {
+function fillCover(page, boldFont, data) {
   const c = LAYOUT.COVER;
   const complex = safe(data.complex);
   const dong = safe(data.dong);
   const ho = safe(data.ho);
   const name = safe(data.name);
+  const size = LAYOUT.FIELD.fontSize;
 
-  drawCoverLine(page, font, c.complexLine, `아파트명 : ${complex}`);
-  drawCoverLine(page, font, c.donghoLine, `동,  호  수 :  ${dong} 동 ${ho}호`);
-  drawCoverLine(page, font, c.nameLine, `입주자 성함  :  ${name}`);
+  drawDataText(page, boldFont, c.complexLine, `아파트명 : ${complex}`, size);
+  drawDataText(page, boldFont, c.donghoLine, `동,  호  수 :  ${dong} 동 ${ho}호`, size);
+  drawDataText(page, boldFont, c.nameLine, `입주자 성함  :  ${name}`, size);
 }
 
 async function fillVisualPage(pdfDoc, page, font, items) {
@@ -270,7 +290,8 @@ async function generateFinalReport0620(reportData, options = {}) {
 
   const templateBytes = fs.readFileSync(templatePath);
   const pdfDoc = await PDFDocument.load(templateBytes);
-  const font = await embedCustomFont(pdfDoc);
+  const fonts = await embedCustomFonts(pdfDoc);
+  const font = fonts.regular;
 
   const visualItems = getVisualItems(reportData);
   const thermalItems = reportData.thermal_inspections || [];
@@ -284,7 +305,7 @@ async function generateFinalReport0620(reportData, options = {}) {
   const pages = pdfDoc.getPages();
   const idx = LAYOUT.PAGE_INDEX;
 
-  if (pages[idx.cover]) fillCover(pages[idx.cover], font, reportData);
+  if (pages[idx.cover]) fillCover(pages[idx.cover], fonts.bold, reportData);
   if (pages[idx.visual]) await fillVisualPage(pdfDoc, pages[idx.visual], font, visualItems);
   if (pages[idx.thermal]) await fillThermalPage(pdfDoc, pages[idx.thermal], font, thermalItems);
   if (pages[idx.air]) await fillAirPage(pdfDoc, pages[idx.air], font, airRows);
