@@ -430,6 +430,26 @@ html, body {
   color: transparent;
 }
 
+.thumb.uploading {
+  opacity: 0.7;
+  outline: 2px dashed #f59e0b;
+}
+
+.thumb.uploading::before {
+  content: '업로드중';
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
 .thumb.has-image::after {
   content: '📷';
   position: absolute;

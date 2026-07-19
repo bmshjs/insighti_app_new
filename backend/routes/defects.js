@@ -1,8 +1,13 @@
 // Defects routes
 const express = require('express');
+const { v4: uuidv4 } = require('uuid');
 const pool = require('../database');
 const { authenticateToken, requireInspectorAccess } = require('../middleware/auth');
 const { decrypt } = require('../utils/encryption');
+
+function newPhotoId() {
+  return `PHOTO-${uuidv4()}`;
+}
 
 // 암호화된 값(IV:hex 형식)이 화면에 그대로 노출되지 않도록: 로컬(키 없음)에서도 hex 문자가 안 보이게
 function isEncryptedFormat(s) {
@@ -236,17 +241,18 @@ router.get('/all', authenticateToken, requireInspectorAccess, async (req, res) =
 
 // Create defect item
 router.post('/', authenticateToken, async (req, res) => {
+  const { case_id, location, trade, content, memo, photo_near_key, photo_far_key } = req.body;
+  const { householdId } = req.user;
+
+  // Validate required fields
+  if (!case_id || !location || !trade || !content) {
+    return res.status(400).json({ error: 'case_id, location, trade, and content are required' });
+  }
+
+  const client = await pool.connect();
   try {
-    const { case_id, location, trade, content, memo, photo_near_key, photo_far_key } = req.body;
-    const { householdId } = req.user;
-
-    // Validate required fields
-    if (!case_id || !location || !trade || !content) {
-      return res.status(400).json({ error: 'case_id, location, trade, and content are required' });
-    }
-
     // case 소유권 검증: 해당 케이스가 요청자(household) 소유인지 확인
-    const caseCheck = await pool.query(
+    const caseCheck = await client.query(
       'SELECT id FROM case_header WHERE id = $1 AND household_id = $2',
       [case_id, householdId]
     );
@@ -259,6 +265,8 @@ router.post('/', authenticateToken, async (req, res) => {
     const random = Math.floor(Math.random() * 1000);
     const defectId = `DEF-${timestamp}-${random}`;
 
+    await client.query('BEGIN');
+
     // Insert defect into database
     const insertQuery = `
       INSERT INTO defect (id, case_id, location, trade, content, memo, created_at)
@@ -266,33 +274,35 @@ router.post('/', authenticateToken, async (req, res) => {
       RETURNING id, case_id, location, trade, content, memo, created_at
     `;
 
-    const result = await pool.query(insertQuery, [defectId, case_id, location, trade, content, memo || '']);
+    const result = await client.query(insertQuery, [defectId, case_id, location, trade, content, memo || '']);
     const defect = result.rows[0];
     
-    // Insert photos if provided
+    // Insert photos if provided (트랜잭션으로 부분 저장 방지)
     if (photo_near_key) {
-      const photoId = `PHOTO-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-      await pool.query(
+      await client.query(
         `INSERT INTO photo (id, defect_id, kind, url, taken_at) 
          VALUES ($1, $2, 'near', $3, NOW())`,
-        [photoId, defectId, `/uploads/${photo_near_key}`]
+        [newPhotoId(), defectId, `/uploads/${photo_near_key}`]
       );
     }
     
     if (photo_far_key) {
-      const photoId = `PHOTO-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-      await pool.query(
+      await client.query(
         `INSERT INTO photo (id, defect_id, kind, url, taken_at) 
          VALUES ($1, $2, 'far', $3, NOW())`,
-        [photoId, defectId, `/uploads/${photo_far_key}`]
+        [newPhotoId(), defectId, `/uploads/${photo_far_key}`]
       );
     }
-    
+
+    await client.query('COMMIT');
     res.status(201).json(defect);
 
   } catch (error) {
+    try { await client.query('ROLLBACK'); } catch (_) { /* ignore */ }
     console.error('Create defect error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
   }
 });
 
@@ -331,11 +341,10 @@ router.put('/:id', authenticateToken, async (req, res) => {
       
       // 새 near 사진이 제공된 경우에만 추가
       if (photo_near_key) {
-        const photoId = `PHOTO-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         await pool.query(
           `INSERT INTO photo (id, defect_id, kind, url, taken_at) 
            VALUES ($1, $2, 'near', $3, NOW())`,
-          [photoId, id, `/uploads/${photo_near_key}`]
+          [newPhotoId(), id, `/uploads/${photo_near_key}`]
         );
       }
     }
@@ -346,11 +355,10 @@ router.put('/:id', authenticateToken, async (req, res) => {
       
       // 새 far 사진이 제공된 경우에만 추가
       if (photo_far_key) {
-        const photoId = `PHOTO-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         await pool.query(
           `INSERT INTO photo (id, defect_id, kind, url, taken_at) 
            VALUES ($1, $2, 'far', $3, NOW())`,
-          [photoId, id, `/uploads/${photo_far_key}`]
+          [newPhotoId(), id, `/uploads/${photo_far_key}`]
         );
       }
     }

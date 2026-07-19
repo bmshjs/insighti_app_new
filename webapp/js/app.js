@@ -70,6 +70,8 @@ const AppState = {
   currentCaseId: null,
   photoNearKey: null,
   photoFarKey: null,
+  /** 사진 업로드 진행 중 여부 (저장 시 레이스 방지) */
+  photoUploading: { near: false, far: false },
   get session() {
     return this._session;
   },
@@ -631,6 +633,13 @@ async function saveDefectEdit() {
   
   setLoading(true);
   try {
+    // 사진 업로드 중이면 완료될 때까지 대기
+    if (AppState.photoUploading.near || AppState.photoUploading.far) {
+      toast('사진 업로드 완료를 기다리는 중...', 'info');
+    }
+    await waitForPendingPhotoUploads();
+    assertPhotoKeysMatchThumbs('#edit-photo-near', '#edit-photo-far');
+
     // 수정 화면에서 새로 업로드된 사진 확인
     // 사진이 새로 업로드된 경우에만 전송 (기존 사진 유지)
     const photoNearKey = AppState.photoNearKey || null;
@@ -657,6 +666,7 @@ async function saveDefectEdit() {
     // 사진 키 초기화
     AppState.photoNearKey = null;
     AppState.photoFarKey = null;
+    AppState.photoUploading = { near: false, far: false };
     
     // 하자 목록으로 돌아가기
     await loadCases();
@@ -706,6 +716,13 @@ async function onSaveDefect(){
   setLoading(true);
   
   try {
+    // 사진 업로드 중이면 완료될 때까지 대기 (근접사진 누락 방지)
+    if (AppState.photoUploading.near || AppState.photoUploading.far) {
+      toast('사진 업로드 완료를 기다리는 중...', 'info');
+    }
+    await waitForPendingPhotoUploads();
+    assertPhotoKeysMatchThumbs('#photo-near', '#photo-far');
+
     // 케이스가 없으면 자동 생성 (통합된 헬퍼 함수 사용)
     const caseId = await ensureCase();
     if (!AppState.currentCaseId) {
@@ -759,11 +776,11 @@ async function onSaveDefect(){
     const photoFar = $('#photo-far');
     if (photoNear) {
       photoNear.style.backgroundImage = '';
-      photoNear.classList.remove('has-image');
+      photoNear.classList.remove('has-image', 'uploading');
     }
     if (photoFar) {
       photoFar.style.backgroundImage = '';
-      photoFar.classList.remove('has-image');
+      photoFar.classList.remove('has-image', 'uploading');
     }
     
     // Clear photo inputs
@@ -779,6 +796,7 @@ async function onSaveDefect(){
     // Clear AppState
     AppState.photoNearKey = null;
     AppState.photoFarKey = null;
+    AppState.photoUploading = { near: false, far: false };
     
     toast('하자가 저장되었습니다', 'success');
     
@@ -1170,12 +1188,36 @@ function markDefectInVideo() {
 // 재촬영 기능 (기획서 요구사항)
 function retakePhotos() {
   $('#photo-near').style.backgroundImage = '';
-  $('#photo-near').classList.remove('has-image');
+  $('#photo-near').classList.remove('has-image', 'uploading');
   $('#photo-far').style.backgroundImage = '';
-  $('#photo-far').classList.remove('has-image');
+  $('#photo-far').classList.remove('has-image', 'uploading');
   AppState.photoNearKey = null;
   AppState.photoFarKey = null;
+  AppState.photoUploading = { near: false, far: false };
   toast('사진을 다시 촬영해주세요', 'info');
+}
+
+/** 사진 업로드 완료 대기 — 썸네일만 있고 key 없는 상태로 저장되는 레이스 방지 */
+async function waitForPendingPhotoUploads(timeoutMs = 90000) {
+  const start = Date.now();
+  while ((AppState.photoUploading.near || AppState.photoUploading.far) && Date.now() - start < timeoutMs) {
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  if (AppState.photoUploading.near || AppState.photoUploading.far) {
+    throw new Error('사진 업로드가 아직 완료되지 않았습니다. 잠시 후 다시 저장해 주세요.');
+  }
+}
+
+/** 썸네일은 있는데 업로드 key가 없으면 저장 차단 */
+function assertPhotoKeysMatchThumbs(nearSelector, farSelector) {
+  const nearEl = $(nearSelector);
+  const farEl = $(farSelector);
+  if (nearEl?.classList.contains('has-image') && !AppState.photoNearKey) {
+    throw new Error('전체사진 업로드가 완료되지 않았습니다. 업로드 완료 후 다시 저장해 주세요.');
+  }
+  if (farEl?.classList.contains('has-image') && !AppState.photoFarKey) {
+    throw new Error('근접사진 업로드가 완료되지 않았습니다. 업로드 완료 후 다시 저장해 주세요.');
+  }
 }
 
 // 이미지 모달 관련 함수
@@ -1272,17 +1314,23 @@ async function handlePhotoUpload(type, inputElement) {
   // 이미지 파일 검증
   if (!file.type.startsWith('image/')) {
     toast('이미지 파일만 업로드 가능합니다', 'error');
+    inputElement.value = '';
     return;
   }
   
   // 파일 크기 검증 (10MB)
   if (file.size > 10 * 1024 * 1024) {
     toast('파일 크기는 10MB 이하여야 합니다', 'error');
+    inputElement.value = '';
     return;
   }
+
+  const isEditMode = type.startsWith('edit-');
+  const photoType = isEditMode ? type.replace('edit-', '') : type; // near | far
+  const slotKey = photoType === 'near' ? 'near' : 'far';
   
   try {
-    toast(`${type === 'near' || type === 'edit-near' ? '전체' : '근접'}사진 처리 중...`, 'info');
+    toast(`${slotKey === 'near' ? '전체' : '근접'}사진 처리 중...`, 'info');
     
     // 파일 미리보기 설정
     const reader = new FileReader();
@@ -1290,24 +1338,29 @@ async function handlePhotoUpload(type, inputElement) {
     reader.onerror = (error) => {
       console.error('❌ FileReader 오류:', error);
       toast('파일 읽기 실패', 'error');
+      AppState.photoUploading[slotKey] = false;
+      inputElement.value = '';
     };
     
     reader.onload = async (e) => {
       console.log('✅ 파일 읽기 완료');
       
-      // 수정 화면인지 확인
-      const isEditMode = type.startsWith('edit-');
-      const photoType = isEditMode ? type.replace('edit-', '') : type;
-      const thumbElementId = isEditMode ? `#edit-photo-${photoType}` : `#photo-${type}`;
+      const thumbElementId = isEditMode ? `#edit-photo-${photoType}` : `#photo-${photoType}`;
       const thumbElement = $(thumbElementId);
       
       if (!thumbElement) {
         console.error('❌ 썸네일 요소를 찾을 수 없습니다:', thumbElementId);
+        AppState.photoUploading[slotKey] = false;
+        inputElement.value = '';
         return;
       }
       
       thumbElement.style.backgroundImage = `url(${e.target.result})`;
-      thumbElement.classList.add('has-image');
+      thumbElement.classList.add('has-image', 'uploading');
+      AppState.photoUploading[slotKey] = true;
+      // 업로드 완료 전 key를 비워 저장 시 stale key/미완료 업로드를 구분
+      if (slotKey === 'near') AppState.photoNearKey = null;
+      else AppState.photoFarKey = null;
       
       try {
         // 이미지 압축 (HD 수준: 1920x1080, 품질 85%)
@@ -1322,14 +1375,17 @@ async function handlePhotoUpload(type, inputElement) {
         
         // AppState에 photo key 저장 (업로드 API는 key 반환, filename은 호환용)
         const photoKey = uploadResult.key || uploadResult.filename;
-        const photoType = isEditMode ? type.replace('edit-', '') : type;
-        if (photoType === 'near') {
+        if (!photoKey) {
+          throw new Error('업로드 응답에 파일 키가 없습니다');
+        }
+        if (slotKey === 'near') {
           AppState.photoNearKey = photoKey;
         } else {
           AppState.photoFarKey = photoKey;
         }
         
-        toast(`${photoType === 'near' ? '전체' : '근접'}사진 업로드 완료!`, 'success');
+        thumbElement.classList.remove('uploading');
+        toast(`${slotKey === 'near' ? '전체' : '근접'}사진 업로드 완료!`, 'success');
         
         // AI 감지 시작 (활성화된 경우에만, 압축된 파일 사용) - 수정 화면에서는 AI 분석 제외
         if (!isEditMode && window.ENABLE_AI_ANALYSIS) {
@@ -1347,7 +1403,12 @@ async function handlePhotoUpload(type, inputElement) {
         toast(error.message || '사진 업로드 실패. 다시 시도해주세요.', 'error');
         // 실패 시 썸네일도 제거
         thumbElement.style.backgroundImage = '';
-        thumbElement.classList.remove('has-image');
+        thumbElement.classList.remove('has-image', 'uploading');
+        if (slotKey === 'near') AppState.photoNearKey = null;
+        else AppState.photoFarKey = null;
+      } finally {
+        AppState.photoUploading[slotKey] = false;
+        inputElement.value = '';
       }
     };
     
@@ -1355,6 +1416,8 @@ async function handlePhotoUpload(type, inputElement) {
     
   } catch (error) {
     console.error('❌ 사진 업로드 실패:', error);
+    AppState.photoUploading[slotKey] = false;
+    inputElement.value = '';
     toast('사진 업로드 중 오류가 발생했습니다', 'error');
   }
 }
