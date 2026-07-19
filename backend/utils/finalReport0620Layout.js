@@ -34,13 +34,15 @@ function cmToPt(cm) {
 /** 사진 출력 위치 보정: 우측 +1cm, 아래 0.3cm (PDF y는 아래로 갈수록 감소) */
 const PHOTO_SHIFT_X = cmToPt(1);
 const PHOTO_SHIFT_Y = -cmToPt(0.3);
+/** 우측(2번) 사진만 추가 우측 이동 */
+const PHOTO_FAR_SHIFT_X = cmToPt(1.4);
 
 function dualPhotoSlots(leftX, bottomY) {
   const x = leftX + PHOTO_SHIFT_X;
   const y = bottomY + PHOTO_SHIFT_Y;
   return {
     photoNear: { x, y, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
-    photoFar: { x: x + PHOTO_SLOT_W_FOR_FAR_X, y, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+    photoFar: { x: x + PHOTO_SLOT_W_FOR_FAR_X + PHOTO_FAR_SHIFT_X, y, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
   };
 }
 
@@ -50,7 +52,12 @@ function visualDualPhotoSlots(leftX, bottomY) {
   const y = bottomY + PHOTO_SHIFT_Y;
   return {
     photoNear: { x: x0 - cmToPt(0.5) + cmToPt(1), y, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
-    photoFar: { x: x0 + PHOTO_SLOT_W_FOR_FAR_X - cmToPt(2.3) + cmToPt(4.6), y, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+    photoFar: {
+      x: x0 + PHOTO_SLOT_W_FOR_FAR_X - cmToPt(2.3) + cmToPt(4.6) + PHOTO_FAR_SHIFT_X,
+      y,
+      w: PHOTO_SLOT_W,
+      h: PHOTO_SLOT_H,
+    },
   };
 }
 
@@ -60,7 +67,12 @@ function thermalDualPhotoSlots(leftX, bottomY) {
   const y = bottomY + PHOTO_SHIFT_Y;
   return {
     photoNear: { x: x0, y, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
-    photoFar: { x: x0 + PHOTO_SLOT_W_FOR_FAR_X + cmToPt(2), y, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+    photoFar: {
+      x: x0 + PHOTO_SLOT_W_FOR_FAR_X + cmToPt(2) + PHOTO_FAR_SHIFT_X,
+      y,
+      w: PHOTO_SLOT_W,
+      h: PHOTO_SLOT_H,
+    },
   };
 }
 
