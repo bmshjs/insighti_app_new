@@ -137,6 +137,34 @@ function collectPhotoUrls(item) {
   return photos.map(getPhotoUrl).filter(Boolean);
 }
 
+/** 육안: UI far(근접)→좌측, near(전체)→우측. kind 없으면 배열 순(0좌/1우). */
+function resolvePhotoSlotTargets(photos, block) {
+  if (!block || !photos?.length) return [];
+  const list = normalizePhotoList(photos);
+  const far = list.find((p) => p.kind === 'far');
+  const near = list.find((p) => p.kind === 'near');
+  const targets = [];
+  if (far || near) {
+    if (far && block.photoNear) targets.push({ url: getPhotoUrl(far), rect: block.photoNear });
+    if (near && block.photoFar) targets.push({ url: getPhotoUrl(near), rect: block.photoFar });
+    list.forEach((p) => {
+      if (p === far || p === near) return;
+      const url = getPhotoUrl(p);
+      if (!url) return;
+      if (block.photoNear && !targets.some((t) => t.rect === block.photoNear)) {
+        targets.push({ url, rect: block.photoNear });
+      } else if (block.photoFar && !targets.some((t) => t.rect === block.photoFar)) {
+        targets.push({ url, rect: block.photoFar });
+      }
+    });
+    return targets.filter((t) => t.url && t.rect);
+  }
+  const urls = list.map(getPhotoUrl).filter(Boolean).slice(0, 2);
+  if (urls[0] && block.photoNear) targets.push({ url: urls[0], rect: block.photoNear });
+  if (urls[1] && block.photoFar) targets.push({ url: urls[1], rect: block.photoFar });
+  return targets;
+}
+
 /** 데이터 필드: align(left|center|right), pos.w 로 정렬 영역 지정 */
 function drawDataText(page, font, pos, text, size = LAYOUT.FIELD.fontSize) {
   if (!pos) return;
@@ -185,20 +213,19 @@ async function embedAndDrawPhoto(pdfDoc, page, fileUrl, rect) {
   }
 }
 
-function buildPhotoSlots(block, urlCount) {
-  if (!block || urlCount <= 0) return [];
-  const slots = [];
-  if (block.photoNear) slots.push(block.photoNear);
-  if (block.photoFar && urlCount > 1) slots.push(block.photoFar);
-  return slots.slice(0, urlCount);
-}
-
-async function drawBlockPhotos(pdfDoc, page, photoUrls, block) {
-  const urls = (photoUrls || []).filter(Boolean).slice(0, 2);
-  if (!urls.length || !block) return;
-  const slots = buildPhotoSlots(block, urls.length);
-  for (let i = 0; i < Math.min(urls.length, slots.length); i++) {
-    await embedAndDrawPhoto(pdfDoc, page, urls[i], slots[i]);
+async function drawBlockPhotos(pdfDoc, page, photosOrUrls, block) {
+  if (!block) return;
+  let targets;
+  if (Array.isArray(photosOrUrls) && photosOrUrls.length && typeof photosOrUrls[0] === 'object') {
+    targets = resolvePhotoSlotTargets(photosOrUrls, block);
+  } else {
+    const urls = (photosOrUrls || []).filter(Boolean).slice(0, 2);
+    targets = [];
+    if (urls[0] && block.photoNear) targets.push({ url: urls[0], rect: block.photoNear });
+    if (urls[1] && block.photoFar) targets.push({ url: urls[1], rect: block.photoFar });
+  }
+  for (const t of targets) {
+    await embedAndDrawPhoto(pdfDoc, page, t.url, t.rect);
   }
 }
 
@@ -228,7 +255,7 @@ async function fillVisualPage(pdfDoc, page, font, items) {
     drawDataText(page, font, b.trade, item?.trade);
     drawDataText(page, font, b.content, item?.note ?? item?.content);
     drawDataText(page, font, b.note, item?.result_text ?? item?.result ?? item?.memo);
-    await drawBlockPhotos(pdfDoc, page, collectPhotoUrls(item), b);
+    await drawBlockPhotos(pdfDoc, page, item?.photos || [], b);
   }
 }
 

@@ -63,7 +63,10 @@ function truncateToFit(text) {
   return s === '-' || !s ? s : String(s);
 }
 
-/** 세대주 등록 하자 사진 → 육안 블록 [근거리, 원거리] 순 (photo 테이블 + defect.photo_near/far) */
+/** 세대주 등록 하자 사진 → 육안 블록용
+ * UI: kind=far(근접사진) → 좌측, kind=near(전체사진) → 우측
+ * 반환 배열은 [좌측용, 우측용] 순이며 kind를 유지한다.
+ */
 function defectPhotosToVisualPhotos(defect) {
   const list = Array.isArray(defect.photos) ? [...defect.photos] : [];
   if (defect.photo_far && !list.some((p) => p.kind === 'far')) {
@@ -77,8 +80,9 @@ function defectPhotosToVisualPhotos(defect) {
   const near = list.find((p) => p.kind === 'near');
   const pushPhoto = (p) => {
     const url = p.url || p.thumb_url || p.file_url;
-    if (url) photos.push({ file_url: url, url });
+    if (url) photos.push({ file_url: url, url, kind: p.kind || null });
   };
+  // 좌측(근접/far) → 우측(전체/near)
   if (far) pushPhoto(far);
   if (near) pushPhoto(near);
   list.forEach((p) => {
