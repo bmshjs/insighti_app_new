@@ -171,7 +171,7 @@ async function embedAndDrawPhoto(pdfDoc, page, fileUrl, rect) {
         image = await pdfDoc.embedPng(buf);
       }
     }
-    // 지정 슬롯(12.2×3.3cm)에 맞게 꽉 채움
+    // 지정 슬롯(8.57×3.85cm)에 맞게 꽉 채움
     page.drawImage(image, {
       x: rect.x,
       y: rect.y,
