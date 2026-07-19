@@ -116,28 +116,19 @@ router.post('/photo', authenticateToken, upload.single('photo'), async (req, res
     const processedBuffer = await fileUploadService.processImage(req.file.buffer, {
       width: 1200,
       height: 1200,
-      quality: 85
+      quality: 80,
     });
 
-    // Generate thumbnail
-    const thumbnailBuffer = await fileUploadService.generateThumbnail(req.file.buffer, 200);
+    // 썸네일은 이미 리사이즈된 버퍼에서 생성 (원본 재처리 제거)
+    const thumbnailBuffer = await fileUploadService.generateThumbnail(processedBuffer, 200);
 
-    // Save files
-    await fileUploadService.saveFile(processedBuffer, fileName);
-    await fileUploadService.saveThumbnail(thumbnailBuffer, fileName);
+    // 디스크 저장 병렬화
+    await Promise.all([
+      fileUploadService.saveFile(processedBuffer, fileName),
+      fileUploadService.saveThumbnail(thumbnailBuffer, fileName),
+    ]);
 
-    // DB 백업 — 재배포 후에도 사진·보고서에서 사용
-    const storageBackupMain = await saveFileToStorage(fileName, processedBuffer, 'image/jpeg');
-    const storageBackupThumb = await saveFileToStorage(`thumbs/thumb-${fileName}`, thumbnailBuffer, 'image/jpeg');
-    const storageBackup = storageBackupMain && storageBackupThumb;
-    if (!storageBackup) {
-      console.error('[upload] DB backup failed:', fileName, {
-        main: storageBackupMain,
-        thumb: storageBackupThumb,
-      });
-    }
-
-    // Return file information
+    // 응답 먼저 반환 — DB 백업은 백그라운드 (업로드/저장 UX 지연 감소)
     res.json({
       key: fileName,
       url: fileUploadService.getFileUrl(fileName),
@@ -145,7 +136,22 @@ router.post('/photo', authenticateToken, upload.single('photo'), async (req, res
       size: processedBuffer.length,
       original_size: req.file.size,
       mimetype: 'image/jpeg',
-      storage_backup: storageBackup,
+      storage_backup: 'pending',
+    });
+
+    setImmediate(() => {
+      Promise.all([
+        saveFileToStorage(fileName, processedBuffer, 'image/jpeg'),
+        saveFileToStorage(`thumbs/thumb-${fileName}`, thumbnailBuffer, 'image/jpeg'),
+      ])
+        .then(([main, thumb]) => {
+          if (!main || !thumb) {
+            console.error('[upload] DB backup failed:', fileName, { main, thumb });
+          }
+        })
+        .catch((err) => {
+          console.error('[upload] DB backup error:', fileName, err.message);
+        });
     });
 
   } catch (error) {

@@ -745,19 +745,20 @@ async function onSaveDefect(){
     };
     
     const newDefect = await api.createDefect(defectData);
-    
-    // 푸시 알림 발송 (하자 등록 완료)
-    try {
-      await api.sendPushNotification('defect-registered', {
-        defectId: newDefect.id,
-        location,
-        trade,
-        content
+
+    // 로컬 목록 즉시 반영 후 화면 전환 (loadCases/푸시 대기로 저장이 느려지지 않게)
+    const caseEntry = (AppState.cases || []).find((c) => c.id === caseId);
+    if (caseEntry) {
+      caseEntry.defects = Array.isArray(caseEntry.defects) ? caseEntry.defects : [];
+      caseEntry.defects.unshift(newDefect);
+    } else {
+      if (!AppState.cases) AppState.cases = [];
+      AppState.cases.unshift({
+        id: caseId,
+        type: '하자접수',
+        created_at: new Date().toISOString(),
+        defects: [newDefect],
       });
-      console.log('✅ Defect registration notification sent');
-    } catch (error) {
-      console.warn('⚠️ Failed to send push notification:', error);
-      // 푸시 알림 실패는 하자 등록을 방해하지 않음
     }
     
     // Clear form
@@ -799,10 +800,21 @@ async function onSaveDefect(){
     AppState.photoUploading = { near: false, far: false };
     
     toast('하자가 저장되었습니다', 'success');
-    
-    // Reload cases and show list
-    await loadCases();
+    renderCaseList();
     route('list');
+
+    // 푸시·목록 재조회는 백그라운드 (저장 UX 블로킹 제거)
+    api.sendPushNotification('defect-registered', {
+      defectId: newDefect.id,
+      location,
+      trade,
+      content
+    }).catch((error) => {
+      console.warn('⚠️ Failed to send push notification:', error);
+    });
+    loadCases().catch((error) => {
+      console.warn('⚠️ Background loadCases failed:', error);
+    });
     
   } catch (error) {
     handleAPIError(error, '');
@@ -858,7 +870,11 @@ async function ensureCase() {
       debugLog('📋 케이스 자동 생성...');
       const newCase = await api.createCase({ type: '하자접수' });
       AppState.currentCaseId = newCase.id;
-      await loadCases();
+      // loadCases 생략 — 저장 경로 지연 방지. 목록 갱신은 저장 후 백그라운드에서 수행
+      if (!AppState.cases) AppState.cases = [];
+      if (!AppState.cases.some((c) => c.id === newCase.id)) {
+        AppState.cases.unshift({ ...newCase, defects: newCase.defects || [] });
+      }
       debugLog('✅ 케이스 생성 완료:', newCase.id);
       return newCase.id;
     } catch (error) {
@@ -1363,14 +1379,14 @@ async function handlePhotoUpload(type, inputElement) {
       else AppState.photoFarKey = null;
       
       try {
-        // 이미지 압축 (HD 수준: 1920x1080, 품질 85%)
+        // 이미지 압축 (저장/업로드 속도 위해 1600px·품질 80%)
         console.log('🗜️ 이미지 압축 시작...');
-        const compressedFile = await compressImage(file, 1920, 1080, 0.85);
+        const compressedFile = await compressImage(file, 1600, 1600, 0.8);
         console.log('✅ 이미지 압축 완료');
         
-        // 서버에 압축된 사진 업로드
+        // 서버에 압축된 사진 업로드 (재압축 생략)
         console.log('📤 서버에 사진 업로드 시작:', type);
-        const uploadResult = await api.uploadImage(compressedFile);
+        const uploadResult = await api.uploadImage(compressedFile, { skipCompress: true });
         console.log('✅ 서버 업로드 완료:', uploadResult);
         
         // AppState에 photo key 저장 (업로드 API는 key 반환, filename은 호환용)

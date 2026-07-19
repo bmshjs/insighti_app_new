@@ -137,10 +137,20 @@ function collectPhotoUrls(item) {
   return photos.map(getPhotoUrl).filter(Boolean);
 }
 
-/** 육안: UI far(근접)→좌측, near(전체)→우측. kind 없으면 배열 순(0좌/1우). */
+/** 육안 사진 슬롯 배치
+ * - 1장만 있으면 항상 좌측부터 채움
+ * - 2장: UI far(근접)→좌측, near(전체)→우측 / kind 없으면 배열 순(0좌/1우)
+ */
 function resolvePhotoSlotTargets(photos, block) {
   if (!block || !photos?.length) return [];
-  const list = normalizePhotoList(photos);
+  const list = normalizePhotoList(photos).filter((p) => getPhotoUrl(p));
+  if (!list.length) return [];
+
+  // 1장만 있으면 kind와 무관하게 좌측 슬롯
+  if (list.length === 1) {
+    return block.photoNear ? [{ url: getPhotoUrl(list[0]), rect: block.photoNear }] : [];
+  }
+
   const far = list.find((p) => p.kind === 'far');
   const near = list.find((p) => p.kind === 'near');
   const targets = [];
@@ -159,9 +169,8 @@ function resolvePhotoSlotTargets(photos, block) {
     });
     return targets.filter((t) => t.url && t.rect);
   }
-  const urls = list.map(getPhotoUrl).filter(Boolean).slice(0, 2);
-  if (urls[0] && block.photoNear) targets.push({ url: urls[0], rect: block.photoNear });
-  if (urls[1] && block.photoFar) targets.push({ url: urls[1], rect: block.photoFar });
+  if (list[0] && block.photoNear) targets.push({ url: getPhotoUrl(list[0]), rect: block.photoNear });
+  if (list[1] && block.photoFar) targets.push({ url: getPhotoUrl(list[1]), rect: block.photoFar });
   return targets;
 }
 

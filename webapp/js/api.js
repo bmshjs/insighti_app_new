@@ -175,33 +175,39 @@ class APIClient {
   }
 
   // File upload
-  async uploadPhoto(file, type = 'near') {
-    const compressImage = (file, maxSize = 1400, quality = 0.8) => new Promise((resolve, reject) => {
-      try {
-        const img = new Image();
-        const url = URL.createObjectURL(file);
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
-          canvas.width = Math.round(img.width * ratio);
-          canvas.height = Math.round(img.height * ratio);
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          canvas.toBlob((blob) => {
-            URL.revokeObjectURL(url);
-            if (!blob) return reject(new Error('이미지 압축 실패'));
-            const compressed = new File([blob], file.name.replace(/\.(png|jpg|jpeg|webp)$/i, '.jpg'), { type: 'image/jpeg' });
-            resolve(compressed);
-          }, 'image/jpeg', quality);
-        };
-        img.onerror = reject;
-        img.src = url;
-      } catch (e) { reject(e); }
-    });
+  async uploadPhoto(file, type = 'near', options = {}) {
+    const { skipCompress = false } = options;
+    let uploadFile = file;
 
-    const optimizedFile = await compressImage(file);
+    if (!skipCompress) {
+      const compressImage = (file, maxSize = 1400, quality = 0.8) => new Promise((resolve, reject) => {
+        try {
+          const img = new Image();
+          const url = URL.createObjectURL(file);
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
+            canvas.width = Math.round(img.width * ratio);
+            canvas.height = Math.round(img.height * ratio);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob((blob) => {
+              URL.revokeObjectURL(url);
+              if (!blob) return reject(new Error('이미지 압축 실패'));
+              const compressed = new File([blob], file.name.replace(/\.(png|jpg|jpeg|webp)$/i, '.jpg'), { type: 'image/jpeg' });
+              resolve(compressed);
+            }, 'image/jpeg', quality);
+          };
+          img.onerror = reject;
+          img.src = url;
+        } catch (e) { reject(e); }
+      });
+
+      uploadFile = await compressImage(file);
+    }
+
     const formData = new FormData();
-    formData.append('photo', optimizedFile);
+    formData.append('photo', uploadFile);
 
     const response = await fetch(`${this.baseURL}/upload/photo`, {
       method: 'POST',
@@ -219,9 +225,9 @@ class APIClient {
     return await response.json();
   }
 
-  // Alias for uploadPhoto (backward compatibility)
-  async uploadImage(file) {
-    return await this.uploadPhoto(file);
+  // Alias for uploadPhoto — 이미 클라이언트에서 압축한 파일은 재압축 생략
+  async uploadImage(file, options = {}) {
+    return await this.uploadPhoto(file, 'near', { skipCompress: true, ...options });
   }
 
   // Reports
