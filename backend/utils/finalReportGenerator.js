@@ -9,8 +9,8 @@ const { loadImageBytes } = require('./photoPath');
 
 const LAYOUT = require('./finalReportLayout');
 
-const TEMPLATE_FILENAME = '종합점검보고서_0711.pdf';
-const TEMPLATE_FILENAME_FALLBACK = '종합점검보고서_0620.pdf';
+const TEMPLATE_FILENAME = '종합점검보고서_0719.pdf';
+const TEMPLATE_FILENAME_FALLBACK = '종합점검보고서_0711.pdf';
 const TEMPLATE_FILENAME_LEGACY = '종합점검보고서_최종1.pdf';
 const TEMPLATE_DIR = path.join(__dirname, '..', 'templates');
 const REPORTS_DIR = path.join(__dirname, '..', 'reports');

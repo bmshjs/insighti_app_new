@@ -1,5 +1,5 @@
 /**
- * 종합점검보고서_0711.pdf 템플릿 필드 좌표 (A4 794×1123pt)
+ * 종합점검보고서_0719.pdf 템플릿 필드 좌표 (A4 794×1123pt)
  * y: PDF 좌하단 원점 기준 (사각형 bottom-left)
  *
  * 사진: 육안·열화상만. 좌/우 2칸(각 10.8×3.3cm), 시작 x좌표는 열화상 기준으로 통일.
@@ -85,7 +85,7 @@ const VISUAL_BLOCKS = [
   },
 ];
 
-/** 열화상 page 3 — result(점검내용)·trade(공종) 라벨열 기준 3cm 들여 좌측정렬 */
+/** 열화상 page 3 — result(점검내용)·trade(공종) 라벨열 기준 3cm 들여 좌측정렬 (0719 블록 간격 반영) */
 const THERMAL_BLOCKS = [
   {
     location: { x: 423, y: 914.5 }, locationNo: { x: 447, y: 914.5 }, trade: leftIndentField(84.1, 754.7),
@@ -93,19 +93,19 @@ const THERMAL_BLOCKS = [
     ...thermalDualPhotoSlots(THERMAL_PHOTO_LEFT_X, 792),
   },
   {
-    location: { x: 423, y: 694.2 }, locationNo: { x: 447, y: 694.2 }, trade: leftIndentField(84.1, 534.5),
-    result: leftIndentField(317, 534.5),
-    ...thermalDualPhotoSlots(THERMAL_PHOTO_LEFT_X, 572),
+    location: { x: 423, y: 677.3 }, locationNo: { x: 447, y: 677.3 }, trade: leftIndentField(84.1, 517.5),
+    result: leftIndentField(317, 517.5),
+    ...thermalDualPhotoSlots(THERMAL_PHOTO_LEFT_X, 555),
   },
   {
-    location: { x: 423, y: 474 }, locationNo: { x: 447, y: 474 }, trade: leftIndentField(84.1, 314.2),
-    result: leftIndentField(317, 314.2),
-    ...thermalDualPhotoSlots(THERMAL_PHOTO_LEFT_X, 352),
+    location: { x: 423, y: 440.1 }, locationNo: { x: 447, y: 440.1 }, trade: leftIndentField(84.1, 280.3),
+    result: leftIndentField(317, 280.3),
+    ...thermalDualPhotoSlots(THERMAL_PHOTO_LEFT_X, 318),
   },
   {
-    location: { x: 423, y: 256.5 }, locationNo: { x: 447, y: 256.5 }, trade: leftIndentField(84.1, 96.8),
-    result: leftIndentField(317, 96.8),
-    ...thermalDualPhotoSlots(THERMAL_PHOTO_LEFT_X, 105),
+    location: { x: 423, y: 197.2 }, locationNo: { x: 447, y: 197.2 }, trade: leftIndentField(84.1, 37.5),
+    result: leftIndentField(317, 37.5),
+    ...thermalDualPhotoSlots(THERMAL_PHOTO_LEFT_X, 75),
   },
 ];
 
