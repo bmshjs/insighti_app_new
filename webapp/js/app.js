@@ -1344,97 +1344,71 @@ async function handlePhotoUpload(type, inputElement) {
   const isEditMode = type.startsWith('edit-');
   const photoType = isEditMode ? type.replace('edit-', '') : type; // near | far
   const slotKey = photoType === 'near' ? 'near' : 'far';
-  
+  const thumbElementId = isEditMode ? `#edit-photo-${photoType}` : `#photo-${photoType}`;
+  const thumbElement = $(thumbElementId);
+
+  if (!thumbElement) {
+    console.error('❌ 썸네일 요소를 찾을 수 없습니다:', thumbElementId);
+    inputElement.value = '';
+    return;
+  }
+
+  // object URL로 즉시 미리보기 (FileReader dataURL보다 훨씬 빠름)
+  const previewUrl = URL.createObjectURL(file);
+  thumbElement.style.backgroundImage = `url(${previewUrl})`;
+  thumbElement.classList.add('has-image', 'uploading');
+  AppState.photoUploading[slotKey] = true;
+  if (slotKey === 'near') AppState.photoNearKey = null;
+  else AppState.photoFarKey = null;
+
+  toast(`${slotKey === 'near' ? '전체' : '근접'}사진 처리 중...`, 'info');
+
   try {
-    toast(`${slotKey === 'near' ? '전체' : '근접'}사진 처리 중...`, 'info');
-    
-    // 파일 미리보기 설정
-    const reader = new FileReader();
-    
-    reader.onerror = (error) => {
-      console.error('❌ FileReader 오류:', error);
-      toast('파일 읽기 실패', 'error');
-      AppState.photoUploading[slotKey] = false;
-      inputElement.value = '';
-    };
-    
-    reader.onload = async (e) => {
-      console.log('✅ 파일 읽기 완료');
-      
-      const thumbElementId = isEditMode ? `#edit-photo-${photoType}` : `#photo-${photoType}`;
-      const thumbElement = $(thumbElementId);
-      
-      if (!thumbElement) {
-        console.error('❌ 썸네일 요소를 찾을 수 없습니다:', thumbElementId);
-        AppState.photoUploading[slotKey] = false;
-        inputElement.value = '';
-        return;
-      }
-      
-      thumbElement.style.backgroundImage = `url(${e.target.result})`;
-      thumbElement.classList.add('has-image', 'uploading');
-      AppState.photoUploading[slotKey] = true;
-      // 업로드 완료 전 key를 비워 저장 시 stale key/미완료 업로드를 구분
-      if (slotKey === 'near') AppState.photoNearKey = null;
-      else AppState.photoFarKey = null;
-      
+    // 이미 작은 JPEG면 재압축 생략
+    const alreadyLight =
+      /^image\/jpe?g$/i.test(file.type) && file.size <= 400 * 1024;
+
+    let uploadFile = file;
+    if (!alreadyLight) {
+      console.log('🗜️ 이미지 압축 시작...');
+      uploadFile = await compressImage(file, 1280, 1280, 0.72);
+      console.log('✅ 이미지 압축 완료');
+    } else {
+      console.log('⚡ 소용량 JPEG — 클라이언트 압축 생략');
+    }
+
+    console.log('📤 서버에 사진 업로드 시작:', type, uploadFile.size, 'bytes');
+    const uploadResult = await api.uploadImage(uploadFile, { skipCompress: true });
+    console.log('✅ 서버 업로드 완료:', uploadResult);
+
+    const photoKey = uploadResult.key || uploadResult.filename;
+    if (!photoKey) {
+      throw new Error('업로드 응답에 파일 키가 없습니다');
+    }
+    if (slotKey === 'near') AppState.photoNearKey = photoKey;
+    else AppState.photoFarKey = photoKey;
+
+    thumbElement.classList.remove('uploading');
+    toast(`${slotKey === 'near' ? '전체' : '근접'}사진 업로드 완료!`, 'success');
+
+    if (!isEditMode && window.ENABLE_AI_ANALYSIS) {
       try {
-        // 이미지 압축 (저장/업로드 속도 위해 1600px·품질 80%)
-        console.log('🗜️ 이미지 압축 시작...');
-        const compressedFile = await compressImage(file, 1600, 1600, 0.8);
-        console.log('✅ 이미지 압축 완료');
-        
-        // 서버에 압축된 사진 업로드 (재압축 생략)
-        console.log('📤 서버에 사진 업로드 시작:', type);
-        const uploadResult = await api.uploadImage(compressedFile, { skipCompress: true });
-        console.log('✅ 서버 업로드 완료:', uploadResult);
-        
-        // AppState에 photo key 저장 (업로드 API는 key 반환, filename은 호환용)
-        const photoKey = uploadResult.key || uploadResult.filename;
-        if (!photoKey) {
-          throw new Error('업로드 응답에 파일 키가 없습니다');
-        }
-        if (slotKey === 'near') {
-          AppState.photoNearKey = photoKey;
-        } else {
-          AppState.photoFarKey = photoKey;
-        }
-        
-        thumbElement.classList.remove('uploading');
-        toast(`${slotKey === 'near' ? '전체' : '근접'}사진 업로드 완료!`, 'success');
-        
-        // AI 감지 시작 (활성화된 경우에만, 압축된 파일 사용) - 수정 화면에서는 AI 분석 제외
-        if (!isEditMode && window.ENABLE_AI_ANALYSIS) {
-          try {
-            await analyzePhotoWithAI(compressedFile, photoType);
-          } catch (aiError) {
-            console.error('❌ AI 분석 오류:', aiError);
-            // AI 오류는 무시하고 계속 진행
-          }
-        } else if (!isEditMode) {
-          console.log('ℹ️ AI 분석이 비활성화되어 있습니다. 사진만 업로드됩니다.');
-        }
-      } catch (error) {
-        console.error('❌ 사진 처리 실패:', error);
-        toast(error.message || '사진 업로드 실패. 다시 시도해주세요.', 'error');
-        // 실패 시 썸네일도 제거
-        thumbElement.style.backgroundImage = '';
-        thumbElement.classList.remove('has-image', 'uploading');
-        if (slotKey === 'near') AppState.photoNearKey = null;
-        else AppState.photoFarKey = null;
-      } finally {
-        AppState.photoUploading[slotKey] = false;
-        inputElement.value = '';
+        await analyzePhotoWithAI(uploadFile, photoType);
+      } catch (aiError) {
+        console.error('❌ AI 분석 오류:', aiError);
       }
-    };
-    
-    reader.readAsDataURL(file);
-    
+    }
   } catch (error) {
-    console.error('❌ 사진 업로드 실패:', error);
+    console.error('❌ 사진 처리 실패:', error);
+    toast(error.message || '사진 업로드 실패. 다시 시도해주세요.', 'error');
+    thumbElement.style.backgroundImage = '';
+    thumbElement.classList.remove('has-image', 'uploading');
+    if (slotKey === 'near') AppState.photoNearKey = null;
+    else AppState.photoFarKey = null;
+  } finally {
     AppState.photoUploading[slotKey] = false;
     inputElement.value = '';
-    toast('사진 업로드 중 오류가 발생했습니다', 'error');
+    URL.revokeObjectURL(previewUrl);
   }
 }
 
@@ -2115,99 +2089,64 @@ function updateAIStatus(enabled) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 /**
- * 이미지를 HD 수준으로 압축
+ * 이미지를 빠르게 압축 (createObjectURL 사용 — dataURL 변환 생략)
  * @param {File} file - 원본 이미지 파일
- * @param {number} maxWidth - 최대 너비 (기본값: 1920)
- * @param {number} maxHeight - 최대 높이 (기본값: 1080)
- * @param {number} quality - JPEG 품질 (0-1, 기본값: 0.85)
+ * @param {number} maxWidth - 최대 너비
+ * @param {number} maxHeight - 최대 높이
+ * @param {number} quality - JPEG 품질 (0-1)
  * @returns {Promise<File>} 압축된 이미지 파일
  */
-async function compressImage(file, maxWidth = 1920, maxHeight = 1080, quality = 0.85) {
+async function compressImage(file, maxWidth = 1280, maxHeight = 1280, quality = 0.72) {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    
-    reader.onerror = () => reject(new Error('파일 읽기 실패'));
-    
-    reader.onload = (e) => {
-      const img = new Image();
-      
-      img.onerror = () => reject(new Error('이미지 로드 실패'));
-      
-      img.onload = () => {
-        try {
-          // 원본 크기
-          const originalWidth = img.width;
-          const originalHeight = img.height;
-          
-          console.log('📐 원본 이미지:', `${originalWidth}x${originalHeight}px`);
-          
-          // 비율 유지하면서 최대 크기 계산
-          let targetWidth = originalWidth;
-          let targetHeight = originalHeight;
-          
-          if (originalWidth > maxWidth || originalHeight > maxHeight) {
-            const ratio = Math.min(maxWidth / originalWidth, maxHeight / originalHeight);
-            targetWidth = Math.round(originalWidth * ratio);
-            targetHeight = Math.round(originalHeight * ratio);
-          }
-          
-          console.log('📐 압축 크기:', `${targetWidth}x${targetHeight}px`);
-          
-          // Canvas에 이미지 그리기
-          const canvas = document.createElement('canvas');
-          canvas.width = targetWidth;
-          canvas.height = targetHeight;
-          
-          const ctx = canvas.getContext('2d');
-          
-          // 이미지 품질 향상을 위한 설정
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-          
-          // 이미지 그리기
-          ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
-          
-          // Blob으로 변환
-          canvas.toBlob(
-            (blob) => {
-              if (!blob) {
-                reject(new Error('이미지 압축 실패'));
-                return;
-              }
-              
-              // File 객체 생성
-              const compressedFile = new File(
-                [blob],
-                file.name,
-                {
-                  type: 'image/jpeg',
-                  lastModified: Date.now()
-                }
-              );
-              
-              const originalSize = (file.size / 1024 / 1024).toFixed(2);
-              const compressedSize = (compressedFile.size / 1024 / 1024).toFixed(2);
-              const reduction = ((1 - compressedFile.size / file.size) * 100).toFixed(1);
-              
-              console.log('✅ 이미지 압축 완료');
-              console.log(`   원본: ${originalSize}MB`);
-              console.log(`   압축: ${compressedSize}MB`);
-              console.log(`   절감: ${reduction}%`);
-              
-              resolve(compressedFile);
-            },
-            'image/jpeg',
-            quality
-          );
-        } catch (error) {
-          reject(error);
-        }
-      };
-      
-      img.src = e.target.result;
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('이미지 로드 실패'));
     };
-    
-    reader.readAsDataURL(file);
+
+    img.onload = () => {
+      try {
+        const originalWidth = img.width;
+        const originalHeight = img.height;
+        let targetWidth = originalWidth;
+        let targetHeight = originalHeight;
+
+        if (originalWidth > maxWidth || originalHeight > maxHeight) {
+          const ratio = Math.min(maxWidth / originalWidth, maxHeight / originalHeight);
+          targetWidth = Math.round(originalWidth * ratio);
+          targetHeight = Math.round(originalHeight * ratio);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'medium';
+        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+        URL.revokeObjectURL(objectUrl);
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error('이미지 압축 실패'));
+              return;
+            }
+            const name = String(file.name || 'photo.jpg').replace(/\.[^.]+$/, '.jpg');
+            resolve(new File([blob], name, { type: 'image/jpeg', lastModified: Date.now() }));
+          },
+          'image/jpeg',
+          quality
+        );
+      } catch (error) {
+        URL.revokeObjectURL(objectUrl);
+        reject(error);
+      }
+    };
+
+    img.src = objectUrl;
   });
 }
 

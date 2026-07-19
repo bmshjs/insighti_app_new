@@ -109,26 +109,20 @@ router.post('/photo', authenticateToken, upload.single('photo'), async (req, res
     // Validate file
     fileUploadService.validateFile(req.file);
 
-    // Generate unique filename
-    const fileName = fileUploadService.generateFileName(req.file.originalname);
-    
-    // Process image (resize, optimize)
-    const processedBuffer = await fileUploadService.processImage(req.file.buffer, {
-      width: 1200,
-      height: 1200,
-      quality: 80,
-    });
+    // Generate unique filename (.jpg 통일 — 클라이언트가 jpeg로 보냄)
+    let fileName = fileUploadService.generateFileName(req.file.originalname);
+    if (!/\.jpe?g$/i.test(fileName)) {
+      fileName = fileName.replace(/\.[^.]+$/, '') + '.jpg';
+    }
 
-    // 썸네일은 이미 리사이즈된 버퍼에서 생성 (원본 재처리 제거)
-    const thumbnailBuffer = await fileUploadService.generateThumbnail(processedBuffer, 200);
+    const { processedBuffer, thumbnailBuffer } = await fileUploadService.processImageWithThumbnail(
+      req.file.buffer,
+      { width: 1200, height: 1200, quality: 78, thumbSize: 200 }
+    );
 
-    // 디스크 저장 병렬화
-    await Promise.all([
-      fileUploadService.saveFile(processedBuffer, fileName),
-      fileUploadService.saveThumbnail(thumbnailBuffer, fileName),
-    ]);
+    // 본문만 동기 저장 후 즉시 응답 — 썸네일/DB 백업은 백그라운드
+    await fileUploadService.saveFile(processedBuffer, fileName);
 
-    // 응답 먼저 반환 — DB 백업은 백그라운드 (업로드/저장 UX 지연 감소)
     res.json({
       key: fileName,
       url: fileUploadService.getFileUrl(fileName),
@@ -141,16 +135,17 @@ router.post('/photo', authenticateToken, upload.single('photo'), async (req, res
 
     setImmediate(() => {
       Promise.all([
+        fileUploadService.saveThumbnail(thumbnailBuffer, fileName),
         saveFileToStorage(fileName, processedBuffer, 'image/jpeg'),
         saveFileToStorage(`thumbs/thumb-${fileName}`, thumbnailBuffer, 'image/jpeg'),
       ])
-        .then(([main, thumb]) => {
+        .then(([, main, thumb]) => {
           if (!main || !thumb) {
             console.error('[upload] DB backup failed:', fileName, { main, thumb });
           }
         })
         .catch((err) => {
-          console.error('[upload] DB backup error:', fileName, err.message);
+          console.error('[upload] background save error:', fileName, err.message);
         });
     });
 

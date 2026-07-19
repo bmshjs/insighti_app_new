@@ -51,20 +51,79 @@ class FileUploadService {
       width = 1200,
       height = 1200,
       quality = 80,
+      skipIfFits = false,
     } = options;
 
     try {
-      const processedBuffer = await this.createSharpInput(input)
+      const sharpInput = this.createSharpInput(input);
+      if (skipIfFits && Buffer.isBuffer(input)) {
+        const meta = await sharpInput.metadata();
+        const w = meta.width || 0;
+        const h = meta.height || 0;
+        if (
+          meta.format === 'jpeg' &&
+          w > 0 && h > 0 &&
+          w <= width && h <= height &&
+          input.length <= 450 * 1024
+        ) {
+          return input;
+        }
+      }
+
+      return await this.createSharpInput(input)
         .resize(width, height, {
           fit: 'inside',
           withoutEnlargement: true,
         })
-        .jpeg({ quality })
+        .jpeg({ quality, mozjpeg: true })
         .toBuffer();
-
-      return processedBuffer;
     } catch (error) {
       console.error('Image processing error:', error);
+      throw new Error('Failed to process image');
+    }
+  }
+
+  /** 본문+썸네일 병렬 생성 */
+  async processImageWithThumbnail(input, options = {}) {
+    const {
+      width = 1200,
+      height = 1200,
+      quality = 78,
+      thumbSize = 200,
+    } = options;
+
+    try {
+      if (Buffer.isBuffer(input)) {
+        const meta = await sharp(input, { failOn: 'none' }).metadata();
+        const w = meta.width || 0;
+        const h = meta.height || 0;
+        if (
+          meta.format === 'jpeg' &&
+          w > 0 && h > 0 &&
+          w <= width && h <= height &&
+          input.length <= 450 * 1024
+        ) {
+          const thumbnailBuffer = await this.generateThumbnail(input, thumbSize);
+          return { processedBuffer: input, thumbnailBuffer, skipped: true };
+        }
+      }
+
+      const base = sharp(input, { failOn: 'none' });
+      const [processedBuffer, thumbnailBuffer] = await Promise.all([
+        base
+          .clone()
+          .resize(width, height, { fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality, mozjpeg: true })
+          .toBuffer(),
+        base
+          .clone()
+          .resize(thumbSize, thumbSize, { fit: 'cover', position: 'center' })
+          .jpeg({ quality: 65 })
+          .toBuffer(),
+      ]);
+      return { processedBuffer, thumbnailBuffer, skipped: false };
+    } catch (error) {
+      console.error('Image process+thumb error:', error);
       throw new Error('Failed to process image');
     }
   }

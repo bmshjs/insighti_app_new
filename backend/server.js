@@ -146,7 +146,7 @@ app.use('/api/sms', smsRoutes);
 app.use('/api/admin', adminRoutes); // NEW: Admin functions
 
 // Root endpoint (for Render health checks)
-const APP_VERSION = '4.4.27';
+const APP_VERSION = '4.4.28';
 
 app.get('/', (req, res) => {
   res.json({ 
