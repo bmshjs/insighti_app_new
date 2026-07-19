@@ -31,26 +31,36 @@ function cmToPt(cm) {
   return Math.round(cm * CM_TO_PT * 10) / 10;
 }
 
+/** 사진 출력 위치 보정: 우측 +1cm, 아래 0.3cm (PDF y는 아래로 갈수록 감소) */
+const PHOTO_SHIFT_X = cmToPt(1);
+const PHOTO_SHIFT_Y = -cmToPt(0.3);
+
 function dualPhotoSlots(leftX, bottomY) {
+  const x = leftX + PHOTO_SHIFT_X;
+  const y = bottomY + PHOTO_SHIFT_Y;
   return {
-    photoNear: { x: leftX, y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
-    photoFar: { x: leftX + PHOTO_SLOT_W_FOR_FAR_X, y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+    photoNear: { x, y, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+    photoFar: { x: x + PHOTO_SLOT_W_FOR_FAR_X, y, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
   };
 }
 
 /** 육안점검 사진: 기준 대비 1번 +1cm, 2번 +4.6cm 우측 (v4.4.14 대비) */
 function visualDualPhotoSlots(leftX, bottomY) {
+  const x0 = leftX + PHOTO_SHIFT_X;
+  const y = bottomY + PHOTO_SHIFT_Y;
   return {
-    photoNear: { x: leftX - cmToPt(0.5) + cmToPt(1), y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
-    photoFar: { x: leftX + PHOTO_SLOT_W_FOR_FAR_X - cmToPt(2.3) + cmToPt(4.6), y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+    photoNear: { x: x0 - cmToPt(0.5) + cmToPt(1), y, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+    photoFar: { x: x0 + PHOTO_SLOT_W_FOR_FAR_X - cmToPt(2.3) + cmToPt(4.6), y, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
   };
 }
 
 /** 열화상점검 사진: 2번 +2cm 우측 */
 function thermalDualPhotoSlots(leftX, bottomY) {
+  const x0 = leftX + PHOTO_SHIFT_X;
+  const y = bottomY + PHOTO_SHIFT_Y;
   return {
-    photoNear: { x: leftX, y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
-    photoFar: { x: leftX + PHOTO_SLOT_W_FOR_FAR_X + cmToPt(2), y: bottomY, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+    photoNear: { x: x0, y, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+    photoFar: { x: x0 + PHOTO_SLOT_W_FOR_FAR_X + cmToPt(2), y, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
   };
 }
 
