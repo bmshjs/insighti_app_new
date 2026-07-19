@@ -286,8 +286,8 @@ async function fillLevelPage(pdfDoc, page, font, items) {
     const item = list[i];
     const b = blocks[i];
     if (!b) continue;
-    const loc = splitLocation(item?.location);
-    drawDataText(page, font, b.location, loc.main);
+    // 레벨기는 위치 번호 전용 필드가 없어 분리 시 "침실1" → "침실"로 잘림 → 전체 위치 출력
+    drawDataText(page, font, b.location, item?.location);
     drawDataText(page, font, b.result, item?.result_text ?? item?.result);
     drawDataText(page, font, b.type, item?.trade);
     drawDataText(page, font, b.memo, item?.note);
