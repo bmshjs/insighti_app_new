@@ -31,17 +31,18 @@ function cmToPt(cm) {
   return Math.round(cm * CM_TO_PT * 10) / 10;
 }
 
-/** 사진 출력 위치 보정: 우측 +1cm, 아래 0.3cm (PDF y는 아래로 갈수록 감소) */
+/** 사진 출력 위치 보정: 공통 우측 +1cm, 아래 0.3cm (PDF y는 아래로 갈수록 감소) */
 const PHOTO_SHIFT_X = cmToPt(1);
 const PHOTO_SHIFT_Y = -cmToPt(0.3);
-/** 우측(2번) 사진만 추가 우측 이동 */
-const PHOTO_FAR_SHIFT_X = cmToPt(1.4);
+/** 좌측(1번)·우측(2번) 사진 추가 우측 이동 */
+const PHOTO_NEAR_SHIFT_X = cmToPt(0.2);
+const PHOTO_FAR_SHIFT_X = cmToPt(1.4) + cmToPt(0.4); // 1.8cm
 
 function dualPhotoSlots(leftX, bottomY) {
   const x = leftX + PHOTO_SHIFT_X;
   const y = bottomY + PHOTO_SHIFT_Y;
   return {
-    photoNear: { x, y, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+    photoNear: { x: x + PHOTO_NEAR_SHIFT_X, y, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
     photoFar: { x: x + PHOTO_SLOT_W_FOR_FAR_X + PHOTO_FAR_SHIFT_X, y, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
   };
 }
@@ -51,7 +52,12 @@ function visualDualPhotoSlots(leftX, bottomY) {
   const x0 = leftX + PHOTO_SHIFT_X;
   const y = bottomY + PHOTO_SHIFT_Y;
   return {
-    photoNear: { x: x0 - cmToPt(0.5) + cmToPt(1), y, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+    photoNear: {
+      x: x0 - cmToPt(0.5) + cmToPt(1) + PHOTO_NEAR_SHIFT_X,
+      y,
+      w: PHOTO_SLOT_W,
+      h: PHOTO_SLOT_H,
+    },
     photoFar: {
       x: x0 + PHOTO_SLOT_W_FOR_FAR_X - cmToPt(2.3) + cmToPt(4.6) + PHOTO_FAR_SHIFT_X,
       y,
@@ -66,7 +72,7 @@ function thermalDualPhotoSlots(leftX, bottomY) {
   const x0 = leftX + PHOTO_SHIFT_X;
   const y = bottomY + PHOTO_SHIFT_Y;
   return {
-    photoNear: { x: x0, y, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
+    photoNear: { x: x0 + PHOTO_NEAR_SHIFT_X, y, w: PHOTO_SLOT_W, h: PHOTO_SLOT_H },
     photoFar: {
       x: x0 + PHOTO_SLOT_W_FOR_FAR_X + cmToPt(2) + PHOTO_FAR_SHIFT_X,
       y,
