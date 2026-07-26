@@ -340,12 +340,7 @@ class APIClient {
       throw new Error(err.message || err.error || `HTTP ${response.status}`);
     }
     const blob = await response.blob();
-    const disposition = response.headers.get('Content-Disposition');
-    let filename = '점검결과.zip';
-    if (disposition) {
-      const match = disposition.match(/filename\*?=(?:UTF-8'')?([^;]+)/i);
-      if (match) filename = decodeURIComponent(match[1].replace(/^["']|["']$/g, '').trim());
-    }
+    let filename = this._parseDownloadFilename(response) || '점검결과.zip';
     const downloadUrl = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = downloadUrl;
@@ -355,6 +350,31 @@ class APIClient {
     document.body.removeChild(link);
     window.URL.revokeObjectURL(downloadUrl);
     return { success: true, filename };
+  }
+
+  /** Content-Disposition / X-Filename 에서 다운로드 파일명 추출 */
+  _parseDownloadFilename(response) {
+    const xName = response.headers.get('X-Filename') || response.headers.get('X-Report-Filename');
+    if (xName) {
+      try {
+        return decodeURIComponent(xName.trim());
+      } catch (_) {
+        return xName.trim();
+      }
+    }
+    const disposition = response.headers.get('Content-Disposition');
+    if (!disposition) return null;
+    const star = disposition.match(/filename\*\s*=\s*(?:UTF-8''|utf-8'')([^;]+)/i);
+    if (star) {
+      try {
+        return decodeURIComponent(star[1].replace(/^["']|["']$/g, '').trim());
+      } catch (_) {
+        return star[1].replace(/^["']|["']$/g, '').trim();
+      }
+    }
+    const plain = disposition.match(/filename\s*=\s*([^;]+)/i);
+    if (plain) return plain[1].replace(/^["']|["']$/g, '').trim();
+    return null;
   }
 
   // SMS

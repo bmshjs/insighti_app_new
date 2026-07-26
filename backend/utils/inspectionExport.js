@@ -7,14 +7,31 @@ const AdmZip = require('adm-zip');
 const { loadImageBytes } = require('./photoPath');
 
 const TYPE_LABELS = { visual: '육안', thermal: '열화상', air: '공기질', radon: '라돈', level: '레벨기' };
+const OWNER_VISUAL_SHEET = '세대주 육안점검결과';
+const OWNER_VISUAL_HEADERS = ['위치', '공종', '내용', '특이사항', '사진파일'];
 
 function safeVal(v) {
   if (v == null || v === '') return '';
   return String(v);
 }
 
+function collectPhotoTags(sheetName, item, rowIndex, photoEntries) {
+  const photos = item.photos || [];
+  const tags = [];
+  photos.forEach((p, pIdx) => {
+    const ext = path.extname(p.file_url || p.url || '') || '.jpg';
+    const tag = `${sheetName.replace(/\s+/g, '')}_${rowIndex}_${pIdx + 1}${ext}`;
+    tags.push(tag);
+    const fileUrl = p.file_url || p.url;
+    if (fileUrl) {
+      photoEntries.push({ zipPath: `${sheetName}/${tag}`, fileUrl });
+    }
+  });
+  return tags;
+}
+
 /**
- * @param {object} data - { visual, thermal, air, radon, level } from loadHouseholdInspectionsForReport
+ * @param {object} data - { visual, thermal, air, radon, level, ownerVisual? }
  * @param {string} dong - 동
  * @param {string} ho - 호
  * @param {object} [options]
@@ -28,21 +45,42 @@ async function buildInspectionExportZip(data, dong = '', ho = '', options = {}) 
   workbook.creator = 'InsightI';
   const xlsxFilename = options.xlsxFilename || '점검내용.xlsx';
   const household = options.household || {};
+  const ownerVisual = data.ownerVisual || [];
 
   const photoEntries = []; // { zipPath, buffer }
 
-  // 1번째 시트: 세대 기본정보 (최초 입력값)
-  const infoSheet = workbook.addWorksheet('세대정보', { headerFooter: { firstHeader: '세대정보' } });
+  // 1번째 시트: 세대정보 + 세대주 육안점검결과
+  const infoSheet = workbook.addWorksheet(OWNER_VISUAL_SHEET, {
+    headerFooter: { firstHeader: OWNER_VISUAL_SHEET }
+  });
   infoSheet.addRow(['항목', '내용']);
   infoSheet.getRow(1).font = { bold: true };
   infoSheet.addRow(['아파트명', safeVal(household.complexName)]);
   infoSheet.addRow(['동호수', safeVal(household.dongHo || [dong, ho].filter(Boolean).join('-'))]);
   infoSheet.addRow(['입주자 성함', safeVal(household.residentName)]);
-  infoSheet.getColumn(1).width = 14;
-  infoSheet.getColumn(2).width = 36;
+  infoSheet.addRow([]);
+
+  const ownerHeaderRow = infoSheet.addRow(OWNER_VISUAL_HEADERS);
+  ownerHeaderRow.font = { bold: true };
+  ownerVisual.forEach((item, idx) => {
+    const rowIndex = idx + 1;
+    const tags = collectPhotoTags(OWNER_VISUAL_SHEET, item, rowIndex, photoEntries);
+    infoSheet.addRow([
+      safeVal(item.location),
+      safeVal(item.trade),
+      safeVal(item.note),
+      safeVal(item.result_text || item.result),
+      tags.join(', ')
+    ]);
+  });
+  OWNER_VISUAL_HEADERS.forEach((_, i) => {
+    const col = infoSheet.getColumn(i + 1);
+    col.width = Math.min(Math.max(OWNER_VISUAL_HEADERS[i].length + 2, i === 0 ? 14 : 12), 40);
+  });
+  if (infoSheet.getColumn(2).width < 36) infoSheet.getColumn(2).width = 36;
 
   // 시트별 데이터 정의: [시트명, 배열, 컬럼 정의]
-  // 육안: 최종보고서와 동일하게 세대주 하자 + 점검원 육안점검 (구분 컬럼으로 구분)
+  // 육안: 세대주 하자 + 점검원 육안점검
   const sheets = [
     ['육안', data.visual || [], (item, tags) => [
       safeVal(item.source || '점검원'),
@@ -107,19 +145,8 @@ async function buildInspectionExportZip(data, dong = '', ho = '', options = {}) 
 
     items.forEach((item, idx) => {
       const rowIndex = idx + 1;
-      const photos = item.photos || [];
-      const tags = [];
-      photos.forEach((p, pIdx) => {
-        const ext = path.extname(p.file_url || p.url || '') || '.jpg';
-        const tag = `${sheetName}_${rowIndex}_${pIdx + 1}${ext}`;
-        tags.push(tag);
-        const fileUrl = p.file_url || p.url;
-        if (fileUrl) {
-          photoEntries.push({ zipPath: `${sheetName}/${tag}`, fileUrl });
-        }
-      });
-      const rowValues = rowFn(item, tags);
-      worksheet.addRow(rowValues);
+      const tags = collectPhotoTags(sheetName, item, rowIndex, photoEntries);
+      worksheet.addRow(rowFn(item, tags));
     });
 
     worksheet.columns.forEach((col, i) => {

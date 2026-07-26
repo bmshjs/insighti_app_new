@@ -485,8 +485,9 @@ router.get('/inspection-export', authenticateToken, async (req, res) => {
       : (row.resident_name || '');
 
     const data = await loadHouseholdInspectionsForReport(householdId);
-    // 육안: 세대주 하자 + 점검원 육안점검 — 입력(등록) 시각 오름차순
+    // 1시트: 세대주 육안점검결과 / 육안 시트: 세대주+점검원 육안점검 (입력 시각 오름차순)
     const defectVisuals = await loadDefectsAsVisualForExport(householdId);
+    data.ownerVisual = defectVisuals.slice().sort((a, b) => toTime(a.created_at) - toTime(b.created_at));
     data.visual = [
       ...defectVisuals,
       ...(data.visual || []).map((v) => ({ ...v, source: '점검원' }))
@@ -509,7 +510,11 @@ router.get('/inspection-export', authenticateToken, async (req, res) => {
     const filename = `${fileBase}.zip`;
 
     res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    res.setHeader('X-Filename', encodeURIComponent(filename));
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="inspection-result.zip"; filename*=UTF-8''${encodeURIComponent(filename)}`
+    );
     res.send(zipBuffer);
   } catch (error) {
     console.error('Inspection export error:', error);
