@@ -19,6 +19,7 @@ function safeVal(v) {
  * @param {string} ho - 호
  * @param {object} [options]
  * @param {string} [options.xlsxFilename] - ZIP 내 엑셀 파일명 (기본: 점검내용.xlsx)
+ * @param {object} [options.household] - { complexName, dongHo, residentName }
  * @returns {Promise<Buffer>} ZIP buffer
  */
 async function buildInspectionExportZip(data, dong = '', ho = '', options = {}) {
@@ -26,8 +27,19 @@ async function buildInspectionExportZip(data, dong = '', ho = '', options = {}) 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'InsightI';
   const xlsxFilename = options.xlsxFilename || '점검내용.xlsx';
+  const household = options.household || {};
 
   const photoEntries = []; // { zipPath, buffer }
+
+  // 1번째 시트: 세대 기본정보 (최초 입력값)
+  const infoSheet = workbook.addWorksheet('세대정보', { headerFooter: { firstHeader: '세대정보' } });
+  infoSheet.addRow(['항목', '내용']);
+  infoSheet.getRow(1).font = { bold: true };
+  infoSheet.addRow(['아파트명', safeVal(household.complexName)]);
+  infoSheet.addRow(['동호수', safeVal(household.dongHo || [dong, ho].filter(Boolean).join('-'))]);
+  infoSheet.addRow(['입주자 성함', safeVal(household.residentName)]);
+  infoSheet.getColumn(1).width = 14;
+  infoSheet.getColumn(2).width = 36;
 
   // 시트별 데이터 정의: [시트명, 배열, 컬럼 정의]
   // 육안: 최종보고서와 동일하게 세대주 하자 + 점검원 육안점검 (구분 컬럼으로 구분)
@@ -79,11 +91,11 @@ async function buildInspectionExportZip(data, dong = '', ho = '', options = {}) 
   ];
 
   const headerBySheet = {
-    육안: ['구분', '위치', '공종', '내용', '결과/특이사항', '사진꼬리표'],
-    열화상: ['위치', '공종', '메모', '결과', '사진꼬리표'],
-    공기질: ['위치', '공종', '유형', 'TVOC', 'HCHO', 'CO2', '메모', '결과', '사진꼬리표'],
-    라돈: ['위치', '공종', '라돈값', '단위', '메모', '결과', '사진꼬리표'],
-    레벨기: ['위치', '공종', '기준(mm)', '4점 좌우값', '메모', '결과', '사진꼬리표']
+    육안: ['구분', '위치', '공종', '내용', '특이사항', '사진파일'],
+    열화상: ['위치', '공종', '메모', '결과', '사진파일'],
+    공기질: ['위치', '공종', '유형', 'TVOC', 'HCHO', 'CO2', '메모', '결과', '사진파일'],
+    라돈: ['위치', '공종', '라돈값', '단위', '메모', '결과', '사진파일'],
+    레벨기: ['위치', '공종', '기준(mm)', '4점 좌우값', '메모', '결과', '사진파일']
   };
 
   for (const [sheetName, items, rowFn] of sheets) {
@@ -92,8 +104,6 @@ async function buildInspectionExportZip(data, dong = '', ho = '', options = {}) 
     worksheet.addRow(headers);
     const headerRow = worksheet.getRow(1);
     headerRow.font = { bold: true };
-
-    const typeKey = Object.keys(TYPE_LABELS).find((k) => TYPE_LABELS[k] === sheetName) || sheetName;
 
     items.forEach((item, idx) => {
       const rowIndex = idx + 1;

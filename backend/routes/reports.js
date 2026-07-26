@@ -468,18 +468,21 @@ router.get('/inspection-export', authenticateToken, async (req, res) => {
     }
 
     const hResult = await pool.query(
-      `SELECT h.dong, h.ho, c.name AS complex_name
+      `SELECT h.dong, h.ho, h.resident_name, h.resident_name_encrypted, c.name AS complex_name
        FROM household h
        JOIN complex c ON h.complex_id = c.id
        WHERE h.id = $1`,
       [householdId]
     );
     const row = hResult.rows[0] || {};
-    // 최초 로그인/등록 시 입력한 아파트명·동·호 그대로 사용
+    // 최초 로그인/등록 시 입력한 아파트명·동·호·성함 그대로 사용
     const complexName = row.complex_name != null ? String(row.complex_name).trim() : '';
     const dong = row.dong != null ? String(row.dong).trim() : '';
     const ho = row.ho != null ? String(row.ho).trim() : '';
     const dongHo = [dong, ho].filter(Boolean).join('-');
+    const residentName = row.resident_name_encrypted
+      ? decrypt(row.resident_name_encrypted)
+      : (row.resident_name || '');
 
     const data = await loadHouseholdInspectionsForReport(householdId);
     // 육안: 세대주 하자 + 점검원 육안점검 — 입력(등록) 시각 오름차순
@@ -495,7 +498,12 @@ router.get('/inspection-export', authenticateToken, async (req, res) => {
     const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 12);
     const fileBase = `${baseName}_${timestamp}`;
     const zipBuffer = await buildInspectionExportZip(data, dong, ho, {
-      xlsxFilename: `${fileBase}.xlsx`
+      xlsxFilename: `${fileBase}.xlsx`,
+      household: {
+        complexName,
+        dongHo,
+        residentName: residentName != null ? String(residentName).trim() : ''
+      }
     });
 
     const filename = `${fileBase}.zip`;
