@@ -53,8 +53,6 @@ async function buildInspectionExportZip(data, dong = '', ho = '', options = {}) 
   const infoSheet = workbook.addWorksheet(OWNER_VISUAL_SHEET, {
     headerFooter: { firstHeader: OWNER_VISUAL_SHEET }
   });
-  infoSheet.addRow(['항목', '내용']);
-  infoSheet.getRow(1).font = { bold: true };
   infoSheet.addRow(['아파트명', safeVal(household.complexName)]);
   infoSheet.addRow(['동호수', safeVal(household.dongHo || [dong, ho].filter(Boolean).join('-'))]);
   infoSheet.addRow(['입주자 성함', safeVal(household.residentName)]);

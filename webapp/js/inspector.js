@@ -1845,7 +1845,12 @@ async function downloadInspectionExport() {
   setLoading(true);
   try {
     toast('점검결과 압축 중...', 'info');
-    await api.getInspectionExport(householdId);
+    const disp = InspectorState.selectedHouseholdDisplay || {};
+    const complexName = (disp.complex_name || '').trim();
+    const dongHo = [disp.dong, disp.ho].filter((v) => v != null && String(v).trim() !== '').join('-');
+    const fallbackName = [complexName, dongHo].filter(Boolean).join('_');
+    const fallbackFilename = (fallbackName ? `${fallbackName}.zip` : '점검결과.zip').replace(/[\\/:*?"<>|]/g, '');
+    await api.getInspectionExport(householdId, fallbackFilename);
     toast('점검결과 다운로드가 완료되었습니다', 'success');
   } catch (error) {
     console.error('점검결과 다운로드 오류:', error);

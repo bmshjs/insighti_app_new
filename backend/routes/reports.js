@@ -493,11 +493,9 @@ router.get('/inspection-export', authenticateToken, async (req, res) => {
       ...(data.visual || []).map((v) => ({ ...v, source: '점검원' }))
     ].sort((a, b) => toTime(a.created_at) - toTime(b.created_at));
 
-    const baseName = sanitizeExportFilenamePart(
-      ['점검결과', complexName, dongHo].filter(Boolean).join('_')
+    const fileBase = sanitizeExportFilenamePart(
+      [complexName, dongHo].filter(Boolean).join('_')
     ) || '점검결과';
-    const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 12);
-    const fileBase = `${baseName}_${timestamp}`;
     const zipBuffer = await buildInspectionExportZip(data, dong, ho, {
       xlsxFilename: `${fileBase}.xlsx`,
       household: {
@@ -510,11 +508,9 @@ router.get('/inspection-export', authenticateToken, async (req, res) => {
     const filename = `${fileBase}.zip`;
 
     res.setHeader('Content-Type', 'application/zip');
+    // 한글 파일명: filename* 만 사용 (filename= ASCII 폴백이 브라우저에 우선 적용되는 문제 방지)
     res.setHeader('X-Filename', encodeURIComponent(filename));
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="inspection-result.zip"; filename*=UTF-8''${encodeURIComponent(filename)}`
-    );
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
     res.send(zipBuffer);
   } catch (error) {
     console.error('Inspection export error:', error);

@@ -329,7 +329,7 @@ class APIClient {
   }
 
   /** 점검원용: 점검결과 내보내기 (엑셀 + 사진 ZIP) — blob 다운로드 */
-  async getInspectionExport(householdId) {
+  async getInspectionExport(householdId, fallbackFilename) {
     const url = `${this.baseURL}/reports/inspection-export?household_id=${encodeURIComponent(householdId)}`;
     const response = await fetch(url, {
       method: 'GET',
@@ -340,7 +340,10 @@ class APIClient {
       throw new Error(err.message || err.error || `HTTP ${response.status}`);
     }
     const blob = await response.blob();
-    let filename = this._parseDownloadFilename(response) || '점검결과.zip';
+    let filename = this._parseDownloadFilename(response);
+    if (!filename || /^inspection-result\.zip$/i.test(filename) || filename === '점검결과.zip') {
+      filename = fallbackFilename || '점검결과.zip';
+    }
     const downloadUrl = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = downloadUrl;
@@ -372,8 +375,10 @@ class APIClient {
         return star[1].replace(/^["']|["']$/g, '').trim();
       }
     }
-    const plain = disposition.match(/filename\s*=\s*([^;]+)/i);
-    if (plain) return plain[1].replace(/^["']|["']$/g, '').trim();
+    const plain = disposition.match(/(?:^|;)\s*filename\s*=\s*([^;]+)/i);
+    if (plain && !/filename\*/i.test(plain[0])) {
+      return plain[1].replace(/^["']|["']$/g, '').trim();
+    }
     return null;
   }
 
