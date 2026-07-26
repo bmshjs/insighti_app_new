@@ -17,12 +17,15 @@ function safeVal(v) {
  * @param {object} data - { visual, thermal, air, radon, level } from loadHouseholdInspectionsForReport
  * @param {string} dong - 동
  * @param {string} ho - 호
+ * @param {object} [options]
+ * @param {string} [options.xlsxFilename] - ZIP 내 엑셀 파일명 (기본: 점검내용.xlsx)
  * @returns {Promise<Buffer>} ZIP buffer
  */
-async function buildInspectionExportZip(data, dong = '', ho = '') {
+async function buildInspectionExportZip(data, dong = '', ho = '', options = {}) {
   const zip = new AdmZip();
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'InsightI';
+  const xlsxFilename = options.xlsxFilename || '점검내용.xlsx';
 
   const photoEntries = []; // { zipPath, buffer }
 
@@ -115,7 +118,7 @@ async function buildInspectionExportZip(data, dong = '', ho = '') {
   }
 
   const xlsxBuf = await workbook.xlsx.writeBuffer();
-  zip.addFile('점검내용.xlsx', Buffer.from(xlsxBuf));
+  zip.addFile(xlsxFilename, Buffer.from(xlsxBuf));
 
   for (const { zipPath, fileUrl } of photoEntries) {
     try {

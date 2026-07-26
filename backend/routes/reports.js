@@ -468,23 +468,37 @@ router.get('/inspection-export', authenticateToken, async (req, res) => {
     }
 
     const hResult = await pool.query(
-      'SELECT h.dong, h.ho FROM household h WHERE h.id = $1',
+      `SELECT h.dong, h.ho, c.name AS complex_name
+       FROM household h
+       JOIN complex c ON h.complex_id = c.id
+       WHERE h.id = $1`,
       [householdId]
     );
-    const dong = (hResult.rows[0] && hResult.rows[0].dong) != null ? String(hResult.rows[0].dong) : '';
-    const ho = (hResult.rows[0] && hResult.rows[0].ho) != null ? String(hResult.rows[0].ho) : '';
+    const row = hResult.rows[0] || {};
+    // 최초 로그인/등록 시 입력한 아파트명·동·호 그대로 사용
+    const complexName = row.complex_name != null ? String(row.complex_name).trim() : '';
+    const dong = row.dong != null ? String(row.dong).trim() : '';
+    const ho = row.ho != null ? String(row.ho).trim() : '';
+    const dongHo = [dong, ho].filter(Boolean).join('-');
 
     const data = await loadHouseholdInspectionsForReport(householdId);
-    // 최종보고서 육안 페이지와 동일: 세대주 등록 하자 → 점검원 육안점검
+    // 육안: 세대주 하자 + 점검원 육안점검 — 입력(등록) 시각 오름차순
     const defectVisuals = await loadDefectsAsVisualForExport(householdId);
     data.visual = [
       ...defectVisuals,
       ...(data.visual || []).map((v) => ({ ...v, source: '점검원' }))
-    ];
-    const zipBuffer = await buildInspectionExportZip(data, dong, ho);
+    ].sort((a, b) => toTime(a.created_at) - toTime(b.created_at));
 
+    const baseName = sanitizeExportFilenamePart(
+      ['점검결과', complexName, dongHo].filter(Boolean).join('_')
+    ) || '점검결과';
     const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 12);
-    const filename = `점검결과_${dong}동_${ho}호_${timestamp}.zip`;
+    const fileBase = `${baseName}_${timestamp}`;
+    const zipBuffer = await buildInspectionExportZip(data, dong, ho, {
+      xlsxFilename: `${fileBase}.xlsx`
+    });
+
+    const filename = `${fileBase}.zip`;
 
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
@@ -509,14 +523,28 @@ function getResultText(result) {
   return resultMap[result] || result;
 }
 
-/** 세대주 등록 하자 → 엑셀 육안 시트용 항목 (최종보고서 getVisualPageItems와 동일 매핑) */
+/** 다운로드 파일명에 쓸 수 없는 문자 제거 (아파트명·동호수는 입력값 유지) */
+function sanitizeExportFilenamePart(name) {
+  return String(name || '')
+    .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function toTime(v) {
+  if (!v) return 0;
+  const t = new Date(v).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+
+/** 세대주 등록 하자 → 엑셀 육안 시트용 항목 (입력 시각 오름차순) */
 async function loadDefectsAsVisualForExport(householdId) {
   const defectsResult = await pool.query(
     `SELECT d.id, d.location, d.trade, d.content, d.memo, d.created_at
      FROM defect d
      JOIN case_header c ON d.case_id = c.id
      WHERE c.household_id = $1
-     ORDER BY c.created_at ASC, d.created_at ASC`,
+     ORDER BY d.created_at ASC`,
     [householdId]
   );
   const defects = defectsResult.rows || [];
