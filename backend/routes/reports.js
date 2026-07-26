@@ -485,13 +485,14 @@ router.get('/inspection-export', authenticateToken, async (req, res) => {
       : (row.resident_name || '');
 
     const data = await loadHouseholdInspectionsForReport(householdId);
-    // 1시트: 세대주 육안점검결과 / 육안 시트: 세대주+점검원 육안점검 (입력 시각 오름차순)
+    // 최종보고서 getVisualPageItems와 동일: 세대주 하자(등록순) → 점검원 육안(입력순)
     const defectVisuals = await loadDefectsAsVisualForExport(householdId);
-    data.ownerVisual = defectVisuals.slice().sort((a, b) => toTime(a.created_at) - toTime(b.created_at));
-    data.visual = [
-      ...defectVisuals,
-      ...(data.visual || []).map((v) => ({ ...v, source: '점검원' }))
-    ].sort((a, b) => toTime(a.created_at) - toTime(b.created_at));
+    const inspectorVisuals = (data.visual || [])
+      .slice()
+      .sort((a, b) => toTime(a.created_at) - toTime(b.created_at))
+      .map((v) => ({ ...v, source: '점검원' }));
+    data.ownerVisual = defectVisuals;
+    data.visual = [...defectVisuals, ...inspectorVisuals];
 
     const fileBase = sanitizeExportFilenamePart(
       [complexName, dongHo].filter(Boolean).join('_')
@@ -546,14 +547,14 @@ function toTime(v) {
   return Number.isFinite(t) ? t : 0;
 }
 
-/** 세대주 등록 하자 → 엑셀 육안 시트용 항목 (입력 시각 오름차순) */
+/** 세대주 등록 하자 → 엑셀 육안용 (최종보고서 loadHouseholdReportData와 동일 순서) */
 async function loadDefectsAsVisualForExport(householdId) {
   const defectsResult = await pool.query(
     `SELECT d.id, d.location, d.trade, d.content, d.memo, d.created_at
      FROM defect d
      JOIN case_header c ON d.case_id = c.id
      WHERE c.household_id = $1
-     ORDER BY d.created_at ASC`,
+     ORDER BY c.created_at DESC, d.created_at DESC`,
     [householdId]
   );
   const defects = defectsResult.rows || [];
