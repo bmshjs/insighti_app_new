@@ -12,6 +12,8 @@ const { decrypt } = require('../utils/encryption');
 const fs = require('fs');
 const path = require('path');
 
+const { defectToVisualItem } = finalReportGenerator;
+
 const router = express.Router();
 
 // 점검원(admin complex)이면 요청의 household_id로 보고서 대상 세대 사용
@@ -473,6 +475,12 @@ router.get('/inspection-export', authenticateToken, async (req, res) => {
     const ho = (hResult.rows[0] && hResult.rows[0].ho) != null ? String(hResult.rows[0].ho) : '';
 
     const data = await loadHouseholdInspectionsForReport(householdId);
+    // 최종보고서 육안 페이지와 동일: 세대주 등록 하자 → 점검원 육안점검
+    const defectVisuals = await loadDefectsAsVisualForExport(householdId);
+    data.visual = [
+      ...defectVisuals,
+      ...(data.visual || []).map((v) => ({ ...v, source: '점검원' }))
+    ];
     const zipBuffer = await buildInspectionExportZip(data, dong, ho);
 
     const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 12);
@@ -499,6 +507,32 @@ function getResultText(result) {
     'na': '해당없음'
   };
   return resultMap[result] || result;
+}
+
+/** 세대주 등록 하자 → 엑셀 육안 시트용 항목 (최종보고서 getVisualPageItems와 동일 매핑) */
+async function loadDefectsAsVisualForExport(householdId) {
+  const defectsResult = await pool.query(
+    `SELECT d.id, d.location, d.trade, d.content, d.memo, d.created_at
+     FROM defect d
+     JOIN case_header c ON d.case_id = c.id
+     WHERE c.household_id = $1
+     ORDER BY c.created_at ASC, d.created_at ASC`,
+    [householdId]
+  );
+  const defects = defectsResult.rows || [];
+  for (const defect of defects) {
+    const photoResult = await pool.query(
+      'SELECT id, kind, url, thumb_url, taken_at FROM photo WHERE defect_id = $1 ORDER BY kind, taken_at',
+      [defect.id]
+    );
+    defect.photos = photoResult.rows || [];
+  }
+  return defects.map((d) => ({
+    ...defectToVisualItem(d),
+    source: '세대주',
+    result: d.memo || '',
+    created_at: d.created_at
+  }));
 }
 
 // 세대(household) 기준 점검결과만 조회 — 최종보고서용 (하자 무관, 타입별 N건)

@@ -27,8 +27,10 @@ async function buildInspectionExportZip(data, dong = '', ho = '') {
   const photoEntries = []; // { zipPath, buffer }
 
   // 시트별 데이터 정의: [시트명, 배열, 컬럼 정의]
+  // 육안: 최종보고서와 동일하게 세대주 하자 + 점검원 육안점검 (구분 컬럼으로 구분)
   const sheets = [
     ['육안', data.visual || [], (item, tags) => [
+      safeVal(item.source || '점검원'),
       safeVal(item.location),
       safeVal(item.trade),
       safeVal(item.note),
@@ -74,7 +76,7 @@ async function buildInspectionExportZip(data, dong = '', ho = '') {
   ];
 
   const headerBySheet = {
-    육안: ['위치', '공종', '메모', '결과', '사진꼬리표'],
+    육안: ['구분', '위치', '공종', '내용', '결과/특이사항', '사진꼬리표'],
     열화상: ['위치', '공종', '메모', '결과', '사진꼬리표'],
     공기질: ['위치', '공종', '유형', 'TVOC', 'HCHO', 'CO2', '메모', '결과', '사진꼬리표'],
     라돈: ['위치', '공종', '라돈값', '단위', '메모', '결과', '사진꼬리표'],
