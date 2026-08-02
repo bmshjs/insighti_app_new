@@ -1521,12 +1521,15 @@ function displayAIDetectionResults(aiResult, photoType) {
   };
   
   if (!defects.length) {
+    const emptyMessage =
+      aiResult?.primary?.description ||
+      '이 사진에서는 하자가 감지되지 않았습니다.';
     aiResultsDiv.innerHTML = `
       <div class="ai-analysis-header">
         <h4>✅ AI 분석 완료</h4>
         <button class="button small" onclick="hideAIAnalysis()">닫기</button>
       </div>
-      <p>이 사진에서는 하자가 감지되지 않았습니다.</p>
+      <p>${emptyMessage}</p>
     `;
     return;
   }

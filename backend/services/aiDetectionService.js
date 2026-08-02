@@ -2,6 +2,7 @@ const azureVisionService = require('./azureVisionService');
 const localVisionService = require('./localVisionService');
 const aiDetectionSettingsService = require('./aiDetectionSettingsService');
 const huggingFaceVisionService = require('./huggingFaceVisionService');
+const { isFeatureAvailable } = require('../utils/errorHandler');
 
 class AiDetectionService {
   /**
@@ -10,6 +11,8 @@ class AiDetectionService {
   async analyze({ imageBase64, photoType = 'near' }) {
     const settings = await aiDetectionSettingsService.getSettings();
     const provider = settings.provider || (settings.mode === 'huggingface' ? 'huggingface' : 'azure');
+    const azureAvailable = isFeatureAvailable('azure-ai');
+    const huggingfaceAvailable = !!process.env.HUGGINGFACE_API_TOKEN;
 
     // 설정된 규칙을 로컬 서비스에 적용
     if (settings.rules) {
@@ -26,10 +29,11 @@ class AiDetectionService {
         localResult = await localVisionService.analyze(imageBase64, {
           baseConfidence: settings.localBaseConfidence
         });
+        // source는 localResult의 'local-rule'보다 뒤에 두어 최종 선택 로직과 일치시킴
         responses.push({
+          ...localResult,
           source: 'local',
-          success: true,
-          ...localResult
+          success: true
         });
       } catch (error) {
         responses.push({
@@ -48,20 +52,29 @@ class AiDetectionService {
             (!localResult || localResult.confidence < settings.azureFallbackThreshold)));
 
       if (shouldCallAzure) {
-        try {
-          const azureAnalysis = await azureVisionService.analyzeDefect(imageBase64, photoType);
-
-          responses.push({
-            source: 'azure',
-            success: true,
-            analysis: azureAnalysis
-          });
-        } catch (error) {
+        if (!azureAvailable) {
           responses.push({
             source: 'azure',
             success: false,
-            error: error.message
+            skipped: true,
+            error: 'Azure OpenAI 환경 변수가 설정되어 있지 않습니다'
           });
+        } else {
+          try {
+            const azureAnalysis = await azureVisionService.analyzeDefect(imageBase64, photoType);
+
+            responses.push({
+              source: 'azure',
+              success: true,
+              analysis: azureAnalysis
+            });
+          } catch (error) {
+            responses.push({
+              source: 'azure',
+              success: false,
+              error: error.message
+            });
+          }
         }
       }
     } else if (provider === 'huggingface') {
@@ -72,28 +85,37 @@ class AiDetectionService {
             (!localResult || localResult.confidence < settings.azureFallbackThreshold)));
 
       if (shouldCallHuggingFace) {
-        try {
-          const hfAnalysis = await huggingFaceVisionService.analyzeDefect(
-            imageBase64,
-            settings.huggingfaceModel,
-            {
-              task: settings.huggingfaceTask,
-              prompt: settings.huggingfacePrompt,
-              maxDetections: settings.maxDetections
-            }
-          );
-
-          responses.push({
-            source: 'huggingface',
-            success: true,
-            analysis: hfAnalysis
-          });
-        } catch (error) {
+        if (!huggingfaceAvailable) {
           responses.push({
             source: 'huggingface',
             success: false,
-            error: error.message
+            skipped: true,
+            error: 'HUGGINGFACE_API_TOKEN 환경 변수가 설정되어 있지 않습니다'
           });
+        } else {
+          try {
+            const hfAnalysis = await huggingFaceVisionService.analyzeDefect(
+              imageBase64,
+              settings.huggingfaceModel,
+              {
+                task: settings.huggingfaceTask,
+                prompt: settings.huggingfacePrompt,
+                maxDetections: settings.maxDetections
+              }
+            );
+
+            responses.push({
+              source: 'huggingface',
+              success: true,
+              analysis: hfAnalysis
+            });
+          } catch (error) {
+            responses.push({
+              source: 'huggingface',
+              success: false,
+              error: error.message
+            });
+          }
         }
       }
     }
@@ -112,7 +134,9 @@ class AiDetectionService {
    */
   _selectFinalDetection(responses, settings) {
     const azureResponse = responses.find((res) => res.source === 'azure' && res.success);
-    const localResponse = responses.find((res) => res.source === 'local' && res.success);
+    const localResponse = responses.find(
+      (res) => (res.source === 'local' || res.source === 'local-rule') && res.success
+    );
     const hfResponse = responses.find((res) => res.source === 'huggingface' && res.success);
 
     if (settings.mode === 'azure' && azureResponse) {
@@ -137,9 +161,20 @@ class AiDetectionService {
       if (localResponse) {
         return { source: 'local', ...localResponse };
       }
+      // 클라우드는 성공했지만 하자가 없으면 그 결과를 사용
+      if (hfResponse) {
+        return { source: 'huggingface', ...hfResponse };
+      }
+      if (azureResponse) {
+        return { source: 'azure', ...azureResponse };
+      }
     }
 
-    // 아무 것도 없는 경우
+    // 클라우드 전용 모드라도 실패 시 로컬 결과로 폴백
+    if (localResponse) {
+      return { source: 'local', ...localResponse };
+    }
+
     return {
       source: null,
       success: false,
@@ -149,4 +184,3 @@ class AiDetectionService {
 }
 
 module.exports = new AiDetectionService();
-

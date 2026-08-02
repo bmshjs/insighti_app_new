@@ -38,15 +38,20 @@ class HybridDetector {
       this.settings = response.settings;
     }
 
+    // HTTP는 성공했지만 분석 자체가 실패한 경우에도 throw하지 않고 결과로 표시
     const finalSource = response?.finalDetection?.source;
     const finalData = response?.finalDetection;
+    const fallbackMessage =
+      response?.finalDetection?.message ||
+      response?.message ||
+      'AI 분석 결과가 없습니다.';
 
     const formatted =
       finalSource === 'azure'
         ? this._formatAzureResult(finalData?.analysis?.detectedDefects || [], totalTime)
         : finalSource === 'huggingface'
         ? this._formatHuggingFaceResult(finalData?.analysis?.detectedDefects || [], totalTime, finalData?.analysis)
-        : finalSource === 'local'
+        : finalSource === 'local' || finalSource === 'local-rule'
         ? this._formatLocalResult(finalData?.detectedDefects || [], totalTime, finalData?.stats)
         : {
             source: 'none',
@@ -55,7 +60,7 @@ class HybridDetector {
               defectType: '판정 불가',
               confidence: 0.0,
               severity: '보통',
-              description: response?.finalDetection?.message || 'AI 분석 결과가 없습니다.'
+              description: fallbackMessage
             },
             totalProcessingTime: totalTime,
             stats: null
