@@ -72,17 +72,26 @@ class APIClient {
           }
           const serverMessage = errorData.message || errorData.error || '';
 
-          // 401/403: 서버가 준 메시지를 그대로 사용 (토큰 만료 vs 점검원 권한 등 구분)
+          // 인증 실패(토큰 없음/만료)만 세션 종료. 권한 부족(403 관리자 전용 등)은 세션 유지
           if (resp.status === 401 || resp.status === 403) {
             const msg = serverMessage || (resp.status === 401 ? '토큰이 만료되었습니다. 다시 로그인해주세요.' : '권한이 없습니다.');
+            const isAuthFailure =
+              resp.status === 401 ||
+              /invalid or expired token|access token required|토큰이 만료|다시 로그인/i.test(String(serverMessage));
+
             console.warn('⚠️', msg);
-            this.clearToken();
-            const isInspectorPage = /inspector\.html$/i.test(window.location.pathname || '');
-            if (window.route && !isInspectorPage) {
-              window.route('login');
+
+            if (isAuthFailure) {
+              this.clearToken();
+              const isInspectorPage = /inspector\.html$/i.test(window.location.pathname || '');
+              if (window.route && !isInspectorPage) {
+                window.route('login');
+              }
             }
+
             const err = new Error(msg);
             err.status = resp.status;
+            err.authFailure = isAuthFailure;
             throw err;
           }
 

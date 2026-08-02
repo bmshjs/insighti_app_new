@@ -105,6 +105,8 @@ router.put('/settings', authenticateToken, async (req, res) => {
       maxDetections,
       huggingfaceEnabled,
       huggingfaceModel,
+      huggingfaceTask,
+      huggingfacePrompt,
       rules
     } = req.body;
 
@@ -118,6 +120,8 @@ router.put('/settings', authenticateToken, async (req, res) => {
       maxDetections,
       huggingfaceEnabled,
       huggingfaceModel,
+      huggingfaceTask,
+      huggingfacePrompt,
       rules
     });
 

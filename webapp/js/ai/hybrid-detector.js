@@ -14,17 +14,10 @@ class HybridDetector {
   }
 
   async initialize() {
-    try {
-      if (window.api && window.api.getAIDetectionSettings) {
-        const response = await window.api.getAIDetectionSettings();
-        if (response && response.success) {
-          this.settings = response.settings;
-          console.log('✅ AI Detection settings loaded:', this.settings);
-        }
-      }
-    } catch (error) {
-      console.warn('⚠️ Failed to load AI detection settings:', error);
-    }
+    // 설정은 관리자 전용 API이므로 입주자 앱에서는 조회하지 않음.
+    // /ai-detection/detect 응답의 settings로 분석 시 갱신한다.
+    this.settings = this.settings || null;
+    console.log('✅ HybridDetector ready (settings load deferred to detect response)');
   }
 
   async analyze(imageFile, photoType = 'near') {

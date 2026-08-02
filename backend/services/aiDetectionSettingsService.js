@@ -99,7 +99,10 @@ class AiDetectionSettingsService {
 
   async upsertSettings(newSettings = {}) {
     await this.ensureTable();
-    const settings = { ...DEFAULT_SETTINGS, ...newSettings };
+    const cleaned = Object.fromEntries(
+      Object.entries(newSettings).filter(([, value]) => value !== undefined)
+    );
+    const settings = { ...DEFAULT_SETTINGS, ...cleaned };
 
     await pool.query(
       `INSERT INTO ai_detection_settings
