@@ -1,5 +1,5 @@
 // Admin Dashboard JavaScript
-// API backend: insighti-app-new.onrender.com (v4.4.35)
+// API backend: insighti-app-new.onrender.com (v4.4.36)
 const $ = (q) => document.querySelector(q);
 const $$ = (q) => document.querySelectorAll(q);
 
@@ -664,12 +664,26 @@ async function searchUsers() {
   }
 }
 
+function formatUserRegisteredAt(user) {
+  const raw = user?.registered_at || user?.created_at;
+  if (!raw) return '-';
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
 function renderUserDeleteRows(users) {
   const tbody = $('#user-delete-tbody');
   if (!tbody) return;
 
   if (!users || users.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">등록된 사용자가 없습니다</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">등록된 사용자가 없습니다</td></tr>';
     return;
   }
 
@@ -681,6 +695,7 @@ function renderUserDeleteRows(users) {
       <td>${escapeHtml(u.ho || '')}</td>
       <td>${escapeHtml(u.resident_name || '')}</td>
       <td>${escapeHtml(u.phone || '')}</td>
+      <td>${escapeHtml(formatUserRegisteredAt(u))}</td>
       <td>${u.total_defects || 0}건</td>
       <td>
         <button class="btn btn-danger btn-small" onclick="deleteUser(${u.id}, this)">삭제</button>
@@ -745,7 +760,7 @@ async function deleteUser(userId, buttonEl) {
     if (row) row.remove();
     const tbody = $('#user-delete-tbody');
     if (tbody && tbody.children.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">등록된 사용자가 없습니다</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">등록된 사용자가 없습니다</td></tr>';
     }
   } catch (error) {
     console.error('Delete user error:', error);

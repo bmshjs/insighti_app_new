@@ -60,6 +60,27 @@ async function ensureHouseholdColumns(client) {
   await client.query(
     `ALTER TABLE household ADD COLUMN IF NOT EXISTS phone_encrypted TEXT`
   );
+  await client.query(
+    `ALTER TABLE household ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT now()`
+  );
+  // 기존 세대: 최초 케이스/토큰 시각으로 등록일 보정
+  await client.query(`
+    UPDATE household h
+    SET created_at = COALESCE(
+      (
+        SELECT MIN(ch.created_at)
+        FROM case_header ch
+        WHERE ch.household_id = h.id
+      ),
+      (
+        SELECT MIN(at.starts_at)
+        FROM access_token at
+        WHERE at.household_id = h.id
+      ),
+      NOW()
+    )
+    WHERE h.created_at IS NULL
+  `);
 }
 
 async function bootstrapDatabase(pool) {

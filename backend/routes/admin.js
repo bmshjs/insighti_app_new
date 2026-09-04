@@ -136,6 +136,11 @@ router.post('/login', async (req, res) => {
 // 전체 사용자 목록 (검색, 필터, 페이지네이션)
 router.get('/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    // 등록일자 컬럼 보장 (없는 DB 대비)
+    await pool.query(
+      `ALTER TABLE household ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT now()`
+    );
+
     const { search, complex_id, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
@@ -144,6 +149,16 @@ router.get('/users', authenticateToken, requireAdmin, async (req, res) => {
         h.id, h.dong, h.ho, 
         h.resident_name, h.resident_name_encrypted,
         h.phone, h.phone_encrypted,
+        h.created_at,
+        COALESCE(
+          h.created_at,
+          MIN(ch.created_at),
+          (
+            SELECT MIN(at.starts_at)
+            FROM access_token at
+            WHERE at.household_id = h.id
+          )
+        ) AS registered_at,
         c.id as complex_id, c.name as complex_name, c.address,
         COUNT(DISTINCT ch.id) as total_cases,
         COUNT(d.id) as total_defects
@@ -179,8 +194,8 @@ router.get('/users', authenticateToken, requireAdmin, async (req, res) => {
     }
 
     query += `
-      GROUP BY h.id, h.dong, h.ho, h.resident_name, h.resident_name_encrypted, h.phone, h.phone_encrypted, c.id, c.name, c.address
-      ORDER BY h.id DESC
+      GROUP BY h.id, h.dong, h.ho, h.resident_name, h.resident_name_encrypted, h.phone, h.phone_encrypted, h.created_at, c.id, c.name, c.address
+      ORDER BY registered_at DESC NULLS LAST, h.id DESC
       LIMIT $${params.length + 1} OFFSET $${params.length + 2}
     `;
     params.push(limit, offset);
