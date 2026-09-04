@@ -62,6 +62,16 @@
     .menu-item span {
       font-size: 16px;
     }
+    .menu-item.menu-danger {
+      color: #ffb4a8;
+      font-weight: 700;
+      border-left: 3px solid #e74c3c;
+    }
+    .menu-item.menu-danger:hover,
+    .menu-item.menu-danger.active {
+      background: #c0392b;
+      color: #fff;
+    }
     
     /* 메인 컨텐츠 */
     .main-content {
@@ -425,7 +435,7 @@
     <div class="sidebar-header">
       <h2>InsightI Admin</h2>
       <div class="admin-info" id="admin-name">Admin</div>
-      <div class="admin-info" style="margin-top: 4px; font-size: 11px; opacity: 0.75;">메뉴 v4.4.33</div>
+      <div class="admin-info" style="margin-top: 4px; font-size: 11px; opacity: 0.75;">메뉴 v4.4.34</div>
     </div>
     
     <div class="sidebar-menu">
@@ -441,7 +451,7 @@
       <div class="menu-item" onclick="showScreen('defects')">
         <span>🏗️</span> 하자 관리
       </div>
-      <div class="menu-item" onclick="showScreen('user-delete')">
+      <div class="menu-item menu-danger" onclick="showScreen('user-delete')">
         <span>🗑️</span> 사용자 삭제
       </div>
       <div class="menu-item" onclick="showScreen('ai-settings')">
@@ -497,6 +507,11 @@
         <div id="recent-defects">
           <p class="text-muted">로딩 중...</p>
         </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">빠른 이동</div>
+        <button class="btn btn-danger" onclick="showScreen('user-delete')">사용자 삭제 화면 열기</button>
       </div>
     </div>
     
@@ -908,7 +923,7 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="js/admin.js?v=4.4.33"></script>
+<script src="js/admin.js?v=4.4.34"></script>
 </body>
 </html>
 
