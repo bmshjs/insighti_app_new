@@ -146,7 +146,7 @@ app.use('/api/sms', smsRoutes);
 app.use('/api/admin', adminRoutes); // NEW: Admin functions
 
 // Root endpoint (for Render health checks)
-const APP_VERSION = '4.4.29';
+const APP_VERSION = '4.4.30';
 
 app.get('/', (req, res) => {
   res.json({ 
@@ -202,10 +202,17 @@ app.post('/health/bootstrap-schema', async (req, res) => {
   const pool = require('./database');
   const { ensureInspectionSchema } = require('./utils/ensureInspectionSchema');
   const { ensureAdminUser } = require('./utils/ensureAdminUser');
+  const { ensureInspectorRegistrationSchema } = require('./utils/ensureInspectorRegistrationSchema');
   try {
     const result = await ensureInspectionSchema(pool);
     const admin = await ensureAdminUser(pool);
-    res.json({ ok: result.ok, inspection_item: result.inspection_item || null, admin });
+    const inspector = await ensureInspectorRegistrationSchema(pool);
+    res.json({
+      ok: result.ok,
+      inspection_item: result.inspection_item || null,
+      admin,
+      inspector
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -313,6 +320,13 @@ async function prepareDatabase() {
     console.log('[startup] admin user:', adminEnsure);
   } catch (error) {
     console.warn('[startup] ensureAdminUser failed:', error.message);
+  }
+  try {
+    const { ensureInspectorRegistrationSchema } = require('./utils/ensureInspectorRegistrationSchema');
+    const inspectorSchema = await ensureInspectorRegistrationSchema(pool);
+    console.log('[startup] inspector_registration:', inspectorSchema);
+  } catch (error) {
+    console.warn('[startup] ensureInspectorRegistrationSchema failed:', error.message);
   }
   try {
     const { ensureFileStorageTable, getFileStorageStats, backfillUploadsFromDisk } = require('./utils/fileStorage');

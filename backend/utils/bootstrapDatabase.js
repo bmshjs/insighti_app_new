@@ -3,6 +3,7 @@ const path = require('path');
 const { restoreReferenceDataIfEmpty, restoreSampleCasesAndDefects, restoreReferenceData, countNonAdminHouseholds } = require('./restoreReferenceData');
 const { ensureInspectionSchema } = require('./ensureInspectionSchema');
 const { ensureAdminUser } = require('./ensureAdminUser');
+const { ensureInspectorRegistrationSchema } = require('./ensureInspectorRegistrationSchema');
 /**
  * DB 연결 후 스키마·점검원 계정·하자 카테고리를 idempotent 하게 준비합니다.
  */
@@ -39,8 +40,7 @@ async function runSqlFile(client, relativePath) {
         msg.includes('already exists') ||
         msg.includes('duplicate key') ||
         msg.includes('duplicate_object') ||
-        (msg.includes('does not exist') && msg.includes('constraint')) ||
-        (msg.includes('does not exist') && msg.includes('relation'))
+        (msg.includes('does not exist') && msg.includes('constraint'))
       ) {
         continue;
       }
@@ -107,6 +107,13 @@ async function bootstrapDatabase(pool) {
       console.log('[bootstrap] admin user:', adminEnsure);
     } catch (error) {
       console.error('[bootstrap] ensureAdminUser failed:', error.message);
+    }
+
+    try {
+      const inspectorSchema = await ensureInspectorRegistrationSchema(client);
+      console.log('[bootstrap] inspector_registration:', inspectorSchema);
+    } catch (error) {
+      console.error('[bootstrap] ensureInspectorRegistrationSchema failed:', error.message);
     }
 
     const defectCount = await client.query('SELECT COUNT(*)::int AS n FROM defect');

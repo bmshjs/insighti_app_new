@@ -4,6 +4,7 @@ const pool = require('../database');
 const { authenticateToken } = require('../middleware/auth');
 const { safeLog } = require('../utils/logger');
 const { encrypt, decrypt } = require('../utils/encryption');
+const { ensureInspectorRegistrationSchema } = require('../utils/ensureInspectorRegistrationSchema');
 
 const router = express.Router();
 
@@ -15,8 +16,21 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+async function ensureInspectorTable(req, res, next) {
+  try {
+    await ensureInspectorRegistrationSchema(pool);
+    next();
+  } catch (error) {
+    safeLog('error', 'inspector_registration 스키마 보장 실패', { error: error.message });
+    res.status(500).json({
+      error: '점검원 등록 테이블 준비 중 오류가 발생했습니다',
+      details: error.message
+    });
+  }
+}
+
 // 점검원 등록 신청
-router.post('/register', async (req, res) => {
+router.post('/register', ensureInspectorTable, async (req, res) => {
   try {
     const { 
       complex, 
@@ -198,7 +212,7 @@ router.get('/status/:registrationId', async (req, res) => {
 });
 
 // 관리자: 대기 중인 점검원 등록 목록 조회
-router.get('/admin/pending', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/admin/pending', authenticateToken, requireAdmin, ensureInspectorTable, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT 
@@ -258,7 +272,7 @@ router.get('/admin/pending', authenticateToken, requireAdmin, async (req, res) =
 });
 
 // 관리자: 점검원 등록 승인/거부
-router.put('/admin/:registrationId/approve', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/admin/:registrationId/approve', authenticateToken, requireAdmin, ensureInspectorTable, async (req, res) => {
   try {
     const { registrationId } = req.params;
     const { approved, rejection_reason } = req.body;
