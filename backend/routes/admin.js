@@ -356,7 +356,19 @@ router.get('/defects', authenticateToken, requireAdmin, ensureResolutionTable, a
     let query = `
       SELECT 
         d.id, d.location, d.trade, d.content, d.memo, 
-        d.photo_near, d.photo_far, d.created_at,
+        d.created_at,
+        (
+          SELECT p.url FROM photo p
+          WHERE p.defect_id = d.id AND p.kind = 'near'
+          ORDER BY p.taken_at NULLS LAST, p.id
+          LIMIT 1
+        ) AS photo_near,
+        (
+          SELECT p.url FROM photo p
+          WHERE p.defect_id = d.id AND p.kind = 'far'
+          ORDER BY p.taken_at NULLS LAST, p.id
+          LIMIT 1
+        ) AS photo_far,
         ch.id as case_id, ch.type as case_type,
         h.id as household_id, h.dong, h.ho, 
         h.resident_name, h.resident_name_encrypted,
