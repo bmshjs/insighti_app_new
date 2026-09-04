@@ -4,6 +4,7 @@ const { restoreReferenceDataIfEmpty, restoreSampleCasesAndDefects, restoreRefere
 const { ensureInspectionSchema } = require('./ensureInspectionSchema');
 const { ensureAdminUser } = require('./ensureAdminUser');
 const { ensureInspectorRegistrationSchema } = require('./ensureInspectorRegistrationSchema');
+const { ensureDefectResolutionSchema } = require('./ensureDefectResolutionSchema');
 /**
  * DB 연결 후 스키마·점검원 계정·하자 카테고리를 idempotent 하게 준비합니다.
  */
@@ -114,6 +115,13 @@ async function bootstrapDatabase(pool) {
       console.log('[bootstrap] inspector_registration:', inspectorSchema);
     } catch (error) {
       console.error('[bootstrap] ensureInspectorRegistrationSchema failed:', error.message);
+    }
+
+    try {
+      const resolutionSchema = await ensureDefectResolutionSchema(client);
+      console.log('[bootstrap] defect_resolution:', resolutionSchema);
+    } catch (error) {
+      console.error('[bootstrap] ensureDefectResolutionSchema failed:', error.message);
     }
 
     const defectCount = await client.query('SELECT COUNT(*)::int AS n FROM defect');

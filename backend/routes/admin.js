@@ -7,8 +7,22 @@ const config = require('../config');
 const { authenticateToken } = require('../middleware/auth');
 const { decrypt } = require('../utils/encryption');
 const { ensureAdminUser } = require('../utils/ensureAdminUser');
+const { ensureDefectResolutionSchema } = require('../utils/ensureDefectResolutionSchema');
 
 const router = express.Router();
+
+async function ensureResolutionTable(req, res, next) {
+  try {
+    await ensureDefectResolutionSchema(pool);
+    next();
+  } catch (error) {
+    console.error('defect_resolution schema ensure failed:', error);
+    res.status(500).json({
+      error: '하자 처리 테이블 준비 중 오류가 발생했습니다',
+      details: error.message
+    });
+  }
+}
 
 // Middleware: Admin 권한 체크
 function requireAdmin(req, res, next) {
@@ -334,7 +348,7 @@ router.delete('/tokens/:id', authenticateToken, requireSuperAdmin, async (req, r
 });
 
 // 전체 하자 목록 (Admin용)
-router.get('/defects', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/defects', authenticateToken, requireAdmin, ensureResolutionTable, async (req, res) => {
   try {
     const { search, complex_id, page = 1, limit = 50 } = req.query;
     const offset = (page - 1) * limit;
@@ -392,16 +406,26 @@ router.get('/defects', authenticateToken, requireAdmin, async (req, res) => {
 
     const result = await pool.query(query, params);
 
-    // 암호화된 필드 복호화
-    const defects = result.rows.map(row => ({
-      ...row,
-      resident_name: row.resident_name_encrypted 
-        ? decrypt(row.resident_name_encrypted) 
-        : row.resident_name,
-      phone: row.phone_encrypted 
-        ? decrypt(row.phone_encrypted) 
-        : row.phone
-    }));
+    // 암호화된 필드 복호화 (깨진 암호문은 평문으로 폴백)
+    const defects = result.rows.map(row => {
+      let residentName = row.resident_name;
+      let phone = row.phone;
+      try {
+        if (row.resident_name_encrypted) {
+          residentName = decrypt(row.resident_name_encrypted);
+        }
+      } catch (_) {}
+      try {
+        if (row.phone_encrypted) {
+          phone = decrypt(row.phone_encrypted);
+        }
+      } catch (_) {}
+      return {
+        ...row,
+        resident_name: residentName,
+        phone
+      };
+    });
 
     res.json({
       defects: defects,
@@ -413,12 +437,12 @@ router.get('/defects', authenticateToken, requireAdmin, async (req, res) => {
 
   } catch (error) {
     console.error('Get admin defects error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
 
 // 처리 결과 등록/수정
-router.post('/defects/:defectId/resolution', authenticateToken, requireSuperAdmin, async (req, res) => {
+router.post('/defects/:defectId/resolution', authenticateToken, requireSuperAdmin, ensureResolutionTable, async (req, res) => {
   try {
     const { defectId } = req.params;
     const { memo, contractor, worker, cost, resolution_photos } = req.body;
@@ -462,7 +486,7 @@ router.post('/defects/:defectId/resolution', authenticateToken, requireSuperAdmi
 });
 
 // 처리 결과 조회
-router.get('/defects/:defectId/resolution', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/defects/:defectId/resolution', authenticateToken, requireAdmin, ensureResolutionTable, async (req, res) => {
   try {
     const { defectId } = req.params;
 
@@ -512,7 +536,7 @@ router.get('/complexes', authenticateToken, requireAdmin, async (req, res) => {
 });
 
 // 통계 대시보드
-router.get('/dashboard/stats', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/dashboard/stats', authenticateToken, requireAdmin, ensureResolutionTable, async (req, res) => {
   try {
     const stats = await pool.query(`
       SELECT 
@@ -530,7 +554,7 @@ router.get('/dashboard/stats', authenticateToken, requireAdmin, async (req, res)
 
   } catch (error) {
     console.error('Get stats error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
 
