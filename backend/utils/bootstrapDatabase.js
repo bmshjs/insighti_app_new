@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { restoreReferenceDataIfEmpty, restoreSampleCasesAndDefects, restoreReferenceData, countNonAdminHouseholds } = require('./restoreReferenceData');
 const { ensureInspectionSchema } = require('./ensureInspectionSchema');
+const { ensureAdminUser } = require('./ensureAdminUser');
 /**
  * DB 연결 후 스키마·점검원 계정·하자 카테고리를 idempotent 하게 준비합니다.
  */
@@ -99,6 +100,13 @@ async function bootstrapDatabase(pool) {
     const inspectionSchema = await ensureInspectionSchema(pool);
     if (!inspectionSchema.ok) {
       console.warn('[bootstrap] inspection schema ensure incomplete');
+    }
+
+    try {
+      const adminEnsure = await ensureAdminUser(client);
+      console.log('[bootstrap] admin user:', adminEnsure);
+    } catch (error) {
+      console.error('[bootstrap] ensureAdminUser failed:', error.message);
     }
 
     const defectCount = await client.query('SELECT COUNT(*)::int AS n FROM defect');

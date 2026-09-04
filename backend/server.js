@@ -146,7 +146,7 @@ app.use('/api/sms', smsRoutes);
 app.use('/api/admin', adminRoutes); // NEW: Admin functions
 
 // Root endpoint (for Render health checks)
-const APP_VERSION = '4.4.28';
+const APP_VERSION = '4.4.29';
 
 app.get('/', (req, res) => {
   res.json({ 
@@ -201,9 +201,11 @@ app.post('/health/bootstrap-schema', async (req, res) => {
   }
   const pool = require('./database');
   const { ensureInspectionSchema } = require('./utils/ensureInspectionSchema');
+  const { ensureAdminUser } = require('./utils/ensureAdminUser');
   try {
     const result = await ensureInspectionSchema(pool);
-    res.json({ ok: result.ok, inspection_item: result.inspection_item || null });
+    const admin = await ensureAdminUser(pool);
+    res.json({ ok: result.ok, inspection_item: result.inspection_item || null, admin });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -305,6 +307,13 @@ async function prepareDatabase() {
     console.warn('[startup] inspection schema ensure failed:', error.message);
   }
   await ensureInspectorHousehold(pool);
+  try {
+    const { ensureAdminUser } = require('./utils/ensureAdminUser');
+    const adminEnsure = await ensureAdminUser(pool);
+    console.log('[startup] admin user:', adminEnsure);
+  } catch (error) {
+    console.warn('[startup] ensureAdminUser failed:', error.message);
+  }
   try {
     const { ensureFileStorageTable, getFileStorageStats, backfillUploadsFromDisk } = require('./utils/fileStorage');
     await ensureFileStorageTable();

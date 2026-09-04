@@ -6,6 +6,7 @@ const pool = require('../database');
 const config = require('../config');
 const { authenticateToken } = require('../middleware/auth');
 const { decrypt } = require('../utils/encryption');
+const { ensureAdminUser } = require('../utils/ensureAdminUser');
 
 const router = express.Router();
 
@@ -47,6 +48,13 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password required' });
     }
 
+    // 기존 데이터가 있어도 admin_user/기본 계정이 빠지는 경우를 복구
+    try {
+      await ensureAdminUser(pool);
+    } catch (ensureError) {
+      console.error('Admin ensure before login failed:', ensureError.message);
+    }
+
     // Admin 조회
     const result = await pool.query(
       'SELECT * FROM admin_user WHERE email = $1 AND is_active = true',
@@ -59,8 +67,16 @@ router.post('/login', async (req, res) => {
 
     const admin = result.rows[0];
 
-    // 비밀번호 확인
-    const validPassword = await bcrypt.compare(password, admin.password_hash);
+    // 비밀번호 확인 (깨진 해시면 비교 예외 방지)
+    let validPassword = false;
+    try {
+      if (typeof admin.password_hash === 'string' && admin.password_hash.startsWith('$2')) {
+        validPassword = await bcrypt.compare(password, admin.password_hash);
+      }
+    } catch (compareError) {
+      console.error('Admin password compare failed:', compareError.message);
+      validPassword = false;
+    }
     if (!validPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -96,7 +112,10 @@ router.post('/login', async (req, res) => {
 
   } catch (error) {
     console.error('Admin login error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({
+      error: 'Internal server error',
+      details: error.message
+    });
   }
 });
 
