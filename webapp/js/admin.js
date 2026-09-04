@@ -1,5 +1,5 @@
 // Admin Dashboard JavaScript
-// API backend: insighti-app-new.onrender.com (v4.4.29)
+// API backend: insighti-app-new.onrender.com (v4.4.33)
 const $ = (q) => document.querySelector(q);
 const $$ = (q) => document.querySelectorAll(q);
 
@@ -540,6 +540,8 @@ function showScreen(screenName) {
     loadDashboardStats();
   } else if (screenName === 'users') {
     loadUsers();
+  } else if (screenName === 'user-delete') {
+    loadUsersForDelete();
   } else if (screenName === 'inspectors') {
     loadInspectorRegistrations();
   } else if (screenName === 'defects') {
@@ -659,6 +661,99 @@ async function searchUsers() {
     
   } catch (error) {
     console.error('Search users error:', error);
+  }
+}
+
+function renderUserDeleteRows(users) {
+  const tbody = $('#user-delete-tbody');
+  if (!tbody) return;
+
+  if (!users || users.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">등록된 사용자가 없습니다</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = users.map((u) => `
+    <tr id="user-delete-row-${u.id}">
+      <td>${u.id}</td>
+      <td>${escapeHtml(u.complex_name || '')}</td>
+      <td>${escapeHtml(u.dong || '')}</td>
+      <td>${escapeHtml(u.ho || '')}</td>
+      <td>${escapeHtml(u.resident_name || '')}</td>
+      <td>${escapeHtml(u.phone || '')}</td>
+      <td>${u.total_defects || 0}건</td>
+      <td>
+        <button class="btn btn-danger btn-small" onclick="deleteUser(${u.id}, this)">삭제</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function loadUsersForDelete() {
+  try {
+    const result = await apiCall('/api/admin/users?limit=1000');
+    renderUserDeleteRows(result.users || []);
+  } catch (error) {
+    console.error('Load users for delete error:', error);
+    toast('사용자 목록 로드 실패', 'error');
+  }
+}
+
+async function searchUsersForDelete() {
+  const search = ($('#user-delete-search')?.value || '').trim();
+  try {
+    const query = search
+      ? `/api/admin/users?search=${encodeURIComponent(search)}&limit=1000`
+      : '/api/admin/users?limit=1000';
+    const result = await apiCall(query);
+    renderUserDeleteRows(result.users || []);
+  } catch (error) {
+    console.error('Search users for delete error:', error);
+    toast('검색 실패', 'error');
+  }
+}
+
+async function deleteUser(userId, buttonEl) {
+  const row = document.getElementById(`user-delete-row-${userId}`);
+  const label = row
+    ? `${row.children[1]?.textContent || ''} ${row.children[2]?.textContent || ''}-${row.children[3]?.textContent || ''} (${row.children[4]?.textContent || ''})`
+    : `ID ${userId}`;
+
+  const confirmed = window.confirm(
+    `다음 사용자를 삭제할까요?\n\n${label}\n\n관련 케이스/하자/점검/토큰 데이터가 함께 삭제되며 복구할 수 없습니다.`
+  );
+  if (!confirmed) return;
+
+  const originalText = buttonEl?.textContent;
+  if (buttonEl) {
+    buttonEl.disabled = true;
+    buttonEl.textContent = '삭제 중...';
+  }
+
+  try {
+    await apiCall(`/api/admin/users/${userId}`, { method: 'DELETE' });
+    toast('사용자를 삭제했습니다', 'success');
+    if (row) row.remove();
+    const tbody = $('#user-delete-tbody');
+    if (tbody && tbody.children.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">등록된 사용자가 없습니다</td></tr>';
+    }
+  } catch (error) {
+    console.error('Delete user error:', error);
+    toast(error.message || '사용자 삭제 실패', 'error');
+    if (buttonEl) {
+      buttonEl.disabled = false;
+      buttonEl.textContent = originalText || '삭제';
+    }
   }
 }
 

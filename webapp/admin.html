@@ -219,6 +219,13 @@
       background: #95a5a6;
       color: white;
     }
+    .btn-danger {
+      background: #e74c3c;
+      color: white;
+    }
+    .btn-danger:hover {
+      background: #c0392b;
+    }
     .btn-small {
       padding: 6px 12px;
       font-size: 12px;
@@ -430,6 +437,9 @@
       <div class="menu-item" onclick="showScreen('defects')">
         <span>🏗️</span> 하자 관리
       </div>
+      <div class="menu-item" onclick="showScreen('user-delete')">
+        <span>🗑️</span> 사용자 삭제
+      </div>
       <div class="menu-item" onclick="showScreen('ai-settings')">
         <span>🤖</span> AI 판정 설정
       </div>
@@ -513,6 +523,47 @@
               </tr>
             </thead>
             <tbody id="users-tbody">
+              <tr>
+                <td colspan="8" class="text-center text-muted">로딩 중...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 사용자 삭제 화면 -->
+    <div id="screen-user-delete" class="screen hidden">
+      <div class="content-header">
+        <h1>🗑️ 사용자 삭제</h1>
+        <button class="btn btn-secondary btn-small" onclick="loadUsersForDelete()">새로고침</button>
+      </div>
+
+      <div class="card">
+        <div class="card-header">전체 사용자 목록</div>
+        <p class="text-muted" style="margin-bottom: 12px;">
+          삭제 시 해당 세대의 케이스·하자·점검·토큰 등 관련 데이터가 함께 삭제됩니다.
+        </p>
+        <div class="search-bar">
+          <input id="user-delete-search" type="text" class="form-input" placeholder="검색: 단지, 동, 호, 이름, 전화번호" />
+          <button class="btn btn-primary" onclick="searchUsersForDelete()">검색</button>
+        </div>
+
+        <div class="table-container">
+          <table id="user-delete-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>단지</th>
+                <th>동</th>
+                <th>호</th>
+                <th>입주자</th>
+                <th>전화번호</th>
+                <th>하자 수</th>
+                <th>작업</th>
+              </tr>
+            </thead>
+            <tbody id="user-delete-tbody">
               <tr>
                 <td colspan="8" class="text-center text-muted">로딩 중...</td>
               </tr>
@@ -853,7 +904,7 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="js/admin.js?v=4.4.29"></script>
+<script src="js/admin.js?v=4.4.33"></script>
 </body>
 </html>
 

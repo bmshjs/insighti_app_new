@@ -298,6 +298,135 @@ router.put('/users/:id', authenticateToken, requireSuperAdmin, async (req, res) 
   }
 });
 
+async function tableExists(client, tableName) {
+  const result = await client.query(
+    `SELECT 1
+     FROM information_schema.tables
+     WHERE table_schema = 'public' AND table_name = $1
+     LIMIT 1`,
+    [tableName]
+  );
+  return result.rows.length > 0;
+}
+
+// 사용자(세대) 및 관련 데이터 삭제
+router.delete('/users/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
+  const householdId = parseInt(req.params.id, 10);
+  if (!Number.isFinite(householdId)) {
+    return res.status(400).json({ error: 'Invalid user id' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const householdResult = await client.query(
+      `SELECT h.id, h.dong, h.ho, h.resident_name, c.name AS complex_name
+       FROM household h
+       JOIN complex c ON c.id = h.complex_id
+       WHERE h.id = $1
+       FOR UPDATE`,
+      [householdId]
+    );
+
+    if (householdResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const household = householdResult.rows[0];
+
+    const caseResult = await client.query(
+      'SELECT id FROM case_header WHERE household_id = $1',
+      [householdId]
+    );
+    const caseIds = caseResult.rows.map((row) => row.id);
+
+    let defectIds = [];
+    let itemIds = [];
+    if (caseIds.length > 0) {
+      defectIds = (
+        await client.query('SELECT id FROM defect WHERE case_id = ANY($1::text[])', [caseIds])
+      ).rows.map((row) => row.id);
+
+      if (await tableExists(client, 'inspection_item')) {
+        itemIds = (
+          await client.query(
+            'SELECT id FROM inspection_item WHERE case_id = ANY($1::text[])',
+            [caseIds]
+          )
+        ).rows.map((row) => row.id);
+      }
+    }
+
+    if (itemIds.length > 0) {
+      for (const tableName of [
+        'thermal_photo',
+        'air_measure',
+        'radon_measure',
+        'level_measure',
+        'inspection_photo'
+      ]) {
+        if (await tableExists(client, tableName)) {
+          await client.query(`DELETE FROM ${tableName} WHERE item_id = ANY($1::text[])`, [itemIds]);
+        }
+      }
+      await client.query('DELETE FROM inspection_item WHERE id = ANY($1::text[])', [itemIds]);
+    }
+
+    if (defectIds.length > 0) {
+      if (await tableExists(client, 'defect_resolution')) {
+        await client.query('DELETE FROM defect_resolution WHERE defect_id = ANY($1::text[])', [
+          defectIds
+        ]);
+      }
+      if (await tableExists(client, 'photo')) {
+        await client.query('DELETE FROM photo WHERE defect_id = ANY($1::text[])', [defectIds]);
+      }
+      await client.query('DELETE FROM defect WHERE id = ANY($1::text[])', [defectIds]);
+    }
+
+    if (caseIds.length > 0) {
+      await client.query('DELETE FROM case_header WHERE id = ANY($1::text[])', [caseIds]);
+    }
+
+    if (await tableExists(client, 'report')) {
+      await client.query('DELETE FROM report WHERE household_id = $1', [householdId]);
+    }
+    if (await tableExists(client, 'access_token')) {
+      await client.query('DELETE FROM access_token WHERE household_id = $1', [householdId]);
+    }
+    if (await tableExists(client, 'push_subscription')) {
+      await client.query('DELETE FROM push_subscription WHERE household_id = $1', [householdId]);
+    }
+
+    await client.query('DELETE FROM household WHERE id = $1', [householdId]);
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      deleted: {
+        id: household.id,
+        complex_name: household.complex_name,
+        dong: household.dong,
+        ho: household.ho,
+        resident_name: household.resident_name,
+        cases: caseIds.length,
+        defects: defectIds.length,
+        inspections: itemIds.length
+      }
+    });
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (_) {}
+    console.error('Delete user error:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
+  } finally {
+    client.release();
+  }
+});
+
 // 토큰 발급/연장
 router.post('/users/:id/tokens', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
