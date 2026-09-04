@@ -1,5 +1,5 @@
 // Admin Dashboard JavaScript
-// API backend: insighti-app-new.onrender.com (v4.4.34)
+// API backend: insighti-app-new.onrender.com (v4.4.35)
 const $ = (q) => document.querySelector(q);
 const $$ = (q) => document.querySelectorAll(q);
 

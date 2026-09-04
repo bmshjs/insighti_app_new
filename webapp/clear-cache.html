@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <title>캐시 초기화 - InsightI</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f7fa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      color: #2c3e50;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 28px;
+      width: min(440px, 92vw);
+      box-shadow: 0 8px 24px rgba(0,0,0,.08);
+      text-align: center;
+    }
+    .status { margin-top: 12px; color: #7f8c8d; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>캐시 초기화 중…</h1>
+    <p class="status" id="status">Service Worker와 브라우저 캐시를 지우는 중입니다.</p>
+  </div>
+  <script>
+    (async function () {
+      const status = document.getElementById('status');
+      try {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          for (const reg of regs) {
+            await reg.unregister();
+          }
+          status.textContent = 'Service Worker 제거 완료. 캐시 삭제 중…';
+        }
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((key) => caches.delete(key)));
+        }
+        status.textContent = '완료. 관리자 페이지로 이동합니다…';
+        setTimeout(() => {
+          location.replace('/admin.html?v=4.4.35');
+        }, 400);
+      } catch (error) {
+        status.textContent = '초기화 실패: ' + (error && error.message ? error.message : error);
+      }
+    })();
+  </script>
+</body>
+</html>

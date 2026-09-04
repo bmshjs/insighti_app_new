@@ -7,6 +7,30 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>관리자 페이지 - InsightI</title>
+  <script>
+    // 일반 창에서 Service Worker가 예전 admin.html을 붙잡는 경우 복구
+    (async function bustAdminCache() {
+      try {
+        if (!('caches' in window)) return;
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key)));
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          for (const reg of regs) {
+            await reg.update();
+          }
+        }
+        if (!document.getElementById('screen-user-delete') && !location.search.includes('reloaded=1')) {
+          const url = new URL(location.href);
+          url.searchParams.set('reloaded', '1');
+          url.searchParams.set('v', '4.4.35');
+          location.replace(url.toString());
+        }
+      } catch (e) {
+        console.warn('admin cache bust skipped', e);
+      }
+    })();
+  </script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -435,7 +459,7 @@
     <div class="sidebar-header">
       <h2>InsightI Admin</h2>
       <div class="admin-info" id="admin-name">Admin</div>
-      <div class="admin-info" style="margin-top: 4px; font-size: 11px; opacity: 0.75;">메뉴 v4.4.34</div>
+      <div class="admin-info" style="margin-top: 4px; font-size: 11px; opacity: 0.75;">메뉴 v4.4.35</div>
     </div>
     
     <div class="sidebar-menu">
@@ -923,7 +947,7 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="js/admin.js?v=4.4.34"></script>
+<script src="js/admin.js?v=4.4.35"></script>
 </body>
 </html>
 
