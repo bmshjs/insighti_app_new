@@ -126,6 +126,45 @@
     .ins-detail-label { color: #6b7280; width: 80px; }
     .saved-results-panel { min-height: 60px; }
     .saved-results-panel.hidden { display: none !important; }
+    .inspector-login-screen {
+      max-width: 400px;
+      margin: 40px auto;
+      padding: 0 16px;
+    }
+    .inspector-login-card {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 28px 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .inspector-login-card h2 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      text-align: center;
+    }
+    .inspector-login-card .login-hint {
+      color: #6b7280;
+      font-size: 13px;
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .inspector-login-card .form-group { margin-bottom: 16px; }
+    .inspector-login-card .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 6px;
+    }
+    .inspector-login-error {
+      display: none;
+      color: #dc2626;
+      font-size: 13px;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    .inspector-login-error.show { display: block; }
   </style>
 </head>
 <body>
@@ -137,6 +176,28 @@
   </div>
 
   <div class="content">
+    <!-- LOGIN -->
+    <div id="login" class="screen">
+      <div class="inspector-login-screen">
+        <div class="inspector-login-card">
+          <h2>점검원 로그인</h2>
+          <p class="login-hint">계정으로 로그인한 뒤 하자 점검을 진행하세요.</p>
+          <form id="inspector-login-form" onsubmit="event.preventDefault(); onInspectorLogin(); return false;">
+            <div class="form-group">
+              <label class="form-label" for="inspector-login-id">ID</label>
+              <input id="inspector-login-id" class="input" type="text" autocomplete="username" required placeholder="ID" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="inspector-login-password">Password</label>
+              <input id="inspector-login-password" class="input" type="password" autocomplete="current-password" required placeholder="Password" />
+            </div>
+            <div id="inspector-login-error" class="inspector-login-error"></div>
+            <button type="submit" class="button" id="inspector-login-btn">로그인</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <!-- USER LIST (하자가 등록된 사용자 목록) -->
     <div id="user-list" class="screen hidden">
       <div class="screen-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">

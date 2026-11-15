@@ -116,62 +116,96 @@ function goBackToUserList() {
   route('user-list');
 }
 
-// 자동 로그인 (점검원 계정으로 자동 로그인)
-async function autoLogin() {
-  if (isLoading) {
-    console.log('⚠️ 이미 로딩 중입니다');
+// 점검원 로그인 계정 (화면 로그인용)
+const INSPECTOR_LOGIN_ID = 'admin';
+const INSPECTOR_LOGIN_PASSWORD = 'admin123';
+
+// 점검원 API 세션용 세대 정보
+const INSPECTOR_HOUSEHOLD = {
+  complex: 'admin',
+  dong: '000',
+  ho: '000',
+  name: '점검원',
+  phone: '010-0000-0000'
+};
+
+function showLoginError(message) {
+  const el = $('#inspector-login-error');
+  if (!el) return;
+  if (message) {
+    el.textContent = message;
+    el.classList.add('show');
+  } else {
+    el.textContent = '';
+    el.classList.remove('show');
+  }
+}
+
+function showLoginScreen() {
+  const idInput = $('#inspector-login-id');
+  const pwInput = $('#inspector-login-password');
+  if (idInput) idInput.value = '';
+  if (pwInput) pwInput.value = '';
+  showLoginError('');
+  route('login');
+  if (idInput) setTimeout(() => idInput.focus(), 50);
+}
+
+/** 점검원 세대 세션 발급 후 사용자 목록으로 이동 */
+async function establishInspectorSession() {
+  const { complex, dong, ho, name, phone } = INSPECTOR_HOUSEHOLD;
+  console.log('📡 점검원 세션 API 호출...', { complex, dong, ho, name, phone });
+  const response = await api.login(complex, dong, ho, name, phone);
+
+  InspectorState.session = {
+    complex, dong, ho, name, phone,
+    token: response.token,
+    expires_at: response.expires_at
+  };
+
+  api.setToken(response.token);
+  localStorage.setItem('inspector_session', JSON.stringify(InspectorState.session));
+  console.log('💾 세션 저장 완료');
+
+  if (typeof loadUserList === 'function') {
+    await loadUserList();
+  }
+
+  route('user-list');
+}
+
+/** ID/Password 로그인 */
+async function onInspectorLogin() {
+  if (isLoading) return;
+
+  const idInput = $('#inspector-login-id');
+  const pwInput = $('#inspector-login-password');
+  const loginBtn = $('#inspector-login-btn');
+  const loginId = (idInput?.value || '').trim();
+  const loginPassword = pwInput?.value || '';
+
+  showLoginError('');
+
+  if (!loginId || !loginPassword) {
+    showLoginError('ID와 Password를 입력하세요.');
     return;
   }
-  
-  console.log('🔐 자동 로그인 시작...');
-  
-  // 점검원 기본 정보 (admin complex)
-  const complex = 'admin';
-  const dong = '000';
-  const ho = '000';
-  const name = '점검원';
-  const phone = '010-0000-0000';
-  
-  const container = $('#user-list-container');
-  if (container) {
-    container.innerHTML = `
-      <div class="card" style="text-align: center; padding: 40px;">
-        <div style="color: #666;">점검원 계정으로 로그인 중...</div>
-      </div>
-    `;
+
+  if (loginId !== INSPECTOR_LOGIN_ID || loginPassword !== INSPECTOR_LOGIN_PASSWORD) {
+    showLoginError('ID 또는 Password가 올바르지 않습니다.');
+    toast('로그인에 실패했습니다', 'error');
+    return;
   }
-  
+
+  setLoading(true);
+  if (loginBtn) {
+    loginBtn.disabled = true;
+    loginBtn.textContent = '로그인 중...';
+  }
+
   try {
-    console.log('📡 로그인 API 호출 중...', { complex, dong, ho, name, phone });
-    const response = await api.login(complex, dong, ho, name, phone);
-    console.log('✅ 로그인 성공:', response);
-    
-    InspectorState.session = {
-      complex, dong, ho, name, phone,
-      token: response.token,
-      expires_at: response.expires_at
-    };
-    
-    api.setToken(response.token);
-    localStorage.setItem('inspector_session', JSON.stringify(InspectorState.session));
-    console.log('💾 세션 저장 완료');
-    
-    // 하자목록 로드
-    console.log('📋 하자목록 로드 시작...');
-    console.log('🔍 loadAllDefects 함수 존재 여부:', typeof loadAllDefects);
-    
-    if (typeof loadUserList === 'function') {
-      try {
-        await loadUserList();
-        console.log('✅ 사용자 목록 로드 완료');
-      } catch (error) {
-        console.error('❌ 사용자 목록 로드 실패:', error);
-      }
-    }
-    
-    console.log('✅ 자동 로그인 완료, 사용자 목록 화면으로 이동');
-    route('user-list');
-    
+    await establishInspectorSession();
+    toast('로그인되었습니다', 'success');
   } catch (error) {
     var detailMsg = error.details || error.message || '알 수 없는 오류';
     if (error.details == null && error.responseText) {
@@ -181,33 +215,31 @@ async function autoLogin() {
       } catch (_) {
         detailMsg = (error.responseText || '').slice(0, 200) || detailMsg;
       }
-      console.error('서버 응답 본문:', error.responseText);
     }
-    console.error('❌ 자동 로그인 오류:', error);
-    console.error('에러 상세:', { message: error.message, details: error.details, detailMsg: detailMsg });
-    toast('점검원 계정으로 자동 로그인에 실패했습니다: ' + detailMsg, 'error');
-    
-    if (container) {
-      container.innerHTML = `
-        <div class="card" style="text-align: center; padding: 40px;">
-          <div style="color: #e74c3c;">로그인에 실패했습니다.</div>
-          <div style="color: #666; font-size: 13px; margin-top: 12px; word-break: break-all;">${escapeHTML(detailMsg)}</div>
-          <div style="color: #999; font-size: 12px; margin-top: 8px;">백엔드 터미널에서 "❌ /api/auth/session error" 로그를 확인하세요.</div>
-        </div>
-      `;
+    console.error('❌ 점검원 로그인 오류:', error);
+    showLoginError('세션 생성에 실패했습니다: ' + detailMsg);
+    toast('로그인에 실패했습니다', 'error');
+  } finally {
+    setLoading(false);
+    if (loginBtn) {
+      loginBtn.disabled = false;
+      loginBtn.textContent = '로그인';
     }
   }
 }
 
-// 로그아웃 (자동 재로그인)
+// 로그아웃 → 로그인 화면으로 이동
 function onLogout() {
-  if (confirm('로그아웃하시겠습니까? (자동으로 다시 로그인됩니다)')) {
+  if (confirm('로그아웃하시겠습니까?')) {
     InspectorState.session = null;
     InspectorState.allDefects = [];
+    InspectorState.selectedHouseholdId = null;
+    InspectorState.selectedHouseholdDisplay = null;
+    InspectorState.userListCache = [];
     api.clearToken();
     localStorage.removeItem('inspector_session');
-    // 자동으로 다시 로그인
-    autoLogin();
+    navigationHistory.length = 0;
+    showLoginScreen();
   }
 }
 
@@ -1997,76 +2029,12 @@ window.addEventListener('DOMContentLoaded', async () => {
     return;
   }
   console.log('✅ API 클라이언트 확인 완료');
-  
-  // 모든 화면 숨기기
-  $$('.screen').forEach(el => el.classList.add('hidden'));
-  
-  // 먼저 사용자 목록 화면 표시 (로딩 중에도 화면이 보이도록)
-  const userListScreen = $('#user-list');
-  if (userListScreen) {
-    userListScreen.classList.remove('hidden');
-    console.log('✅ 사용자 목록 화면 표시');
-  } else {
-    console.error('❌ 사용자 목록 화면을 찾을 수 없습니다');
-  }
-  
-  const container = $('#user-list-container');
-  if (container) {
-    container.innerHTML = `
-      <div class="card" style="text-align: center; padding: 40px;">
-        <div style="color: #666;">점검원 계정으로 로그인 중...</div>
-        <div style="color: #999; font-size: 12px; margin-top: 8px;">잠시만 기다려주세요</div>
-      </div>
-    `;
-  }
-  
-  // 세션 복원 시도
-  const savedSession = localStorage.getItem('inspector_session');
-  console.log('💾 저장된 세션 확인:', savedSession ? '있음' : '없음');
-  
-  if (savedSession) {
-    try {
-      const session = JSON.parse(savedSession);
-      if (session && session.token) {
-        console.log('🔄 저장된 세션 발견, 토큰 유효성 검증 중...');
-        // 토큰 유효성 검증
-        try {
-          api.setToken(session.token);
-          console.log('📡 케이스 목록 조회 API 호출 중...');
-          await api.getCases();
-          
-          // 토큰이 유효한 경우에만 세션 복원
-          console.log('✅ 토큰 유효성 확인 완료, 세션 복원 중...');
-          InspectorState.session = session;
-          
-          console.log('📋 사용자 목록 로드 시작...');
-          await loadUserList();
-          
-          console.log('✅ 세션 복원 완료, 사용자 목록 화면으로 이동');
-          route('user-list');
-          return; // 성공 시 여기서 종료
-        } catch (error) {
-          // 토큰이 만료되었거나 유효하지 않은 경우
-          console.error('❌ 토큰이 만료되었거나 유효하지 않습니다:', error);
-          localStorage.removeItem('inspector_session');
-          api.clearToken();
-          // 자동 로그인 시도
-          console.log('🔄 자동 로그인 시도...');
-          await autoLogin();
-          return;
-        }
-      } else {
-        console.log('⚠️ 저장된 세션에 토큰이 없습니다');
-      }
-    } catch (error) {
-      console.error('❌ 세션 복원 실패:', error);
-      localStorage.removeItem('inspector_session');
-    }
-  }
-  
-  // 세션이 없거나 복원 실패 시 자동 로그인
-  console.log('🔄 자동 로그인 시작...');
-  await autoLogin();
-  console.log('✅ 초기화 완료');
+
+  // 접속 시마다 로그인 화면 표시 (이전 세션 미사용)
+  InspectorState.session = null;
+  if (typeof api.clearToken === 'function') api.clearToken();
+  localStorage.removeItem('inspector_session');
+  showLoginScreen();
+  console.log('✅ 로그인 화면 표시');
 });
 

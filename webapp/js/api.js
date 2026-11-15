@@ -84,7 +84,14 @@ class APIClient {
             if (isAuthFailure) {
               this.clearToken();
               const isInspectorPage = /inspector\.html$/i.test(window.location.pathname || '');
-              if (window.route && !isInspectorPage) {
+              if (isInspectorPage) {
+                try { localStorage.removeItem('inspector_session'); } catch (_) {}
+                if (typeof showLoginScreen === 'function') {
+                  showLoginScreen();
+                } else if (typeof route === 'function') {
+                  route('login');
+                }
+              } else if (window.route) {
                 window.route('login');
               }
             }
